@@ -72,7 +72,7 @@ These are not assumptions — they are open questions that only the data can ans
 |----|---------|----------------|-------|
 | U-01 | Which features have the strongest correlation with `SalePrice`? | Compute correlation matrix; plot feature importances from a rough model | Phase 1 |
 | U-02 | ~~How severe is the missing-value problem? Which columns have >20% missing?~~ **RESOLVED** — 5 columns exceed 20% missing: `PoolQC` (~99%), `MiscFeature` (~96%), `Alley` (~93%), `Fence` (~80%), `FireplaceQu` (~47%). All are Group A (NA = no feature) — none are dropped. | Phase 1 ✅ |
-| U-03 | Is `SalePrice` normally distributed or does it need a log transform? | Plot histogram and Q-Q plot of target variable | Phase 1 |
+| U-03 | ~~Is `SalePrice` normally distributed or does it need a log transform?~~ **RESOLVED** — Raw skewness = 1.74 (strong right skew); log1p skewness = 0.12 (near-normal). Q-Q plot confirms the upper tail deviates significantly from the reference line in raw form; log1p corrects it. Decision: apply `np.log1p()` before training, `np.expm1()` to convert predictions back to USD. | Phase 1 ✅ |
 | U-04 | Which categorical features have high cardinality (>20 unique values)? | Count unique values per categorical column | Phase 1 |
 | U-05 | Are there outlier properties in the dataset that should be excluded from training? | Scatter plot: SalePrice vs GrLivArea; identify extreme cheap/large properties | Phase 1 |
 | U-06 | Which 10–15 features will the LLM schema focus on? | Determined after U-01 and U-02 are resolved | Phase 1 → Phase 3 |
@@ -115,7 +115,7 @@ These are not assumptions — they are open questions that only the data can ans
 - [ ] **Q1:** Which features will be included in the schema? (Requires EDA — Phase 1 must complete first)
 - [ ] **Q2:** What is the baseline MAE on Ames using only the top 10 features? (Establishes the target model must beat)
 - [ ] **Q3:** How will we handle categorical features with rare values that may not appear in production input?
-- [ ] **Q4:** Will `SalePrice` be log-transformed? (Confirm via EDA histogram + Q-Q plot)
+- [x] **Q4:** Will `SalePrice` be log-transformed? **Yes** — `np.log1p()` before training; `np.expm1()` on predictions. Raw skewness = 1.74, log1p skewness = 0.12. Confirmed via histogram and Q-Q plot in `ml/eda.ipynb` Section 5.
 - [x] **Q5:** What imputation strategy will be used for numeric vs. categorical missing values? **ANSWERED** — Group A (NA = no feature): encode as `"None"` / binary. Group B: numeric → median (train only); categorical → mode (train only). All inside `sklearn.Pipeline`.
 
 ### Before Phase 3 (LLM Extraction Design)

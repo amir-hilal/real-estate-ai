@@ -1,6 +1,6 @@
 # Phase 1: Discovery and Exploratory Data Analysis (EDA)
 
-> **Status:** Not Started  
+> **Status:** In Progress  
 > **Depends on:** Phase 0 (Documentation) complete  
 > **Blocks:** Phase 2 (ML Foundation) — no modeling begins without Phase 1 findings
 
@@ -53,23 +53,23 @@ By the end of Phase 1, the following must be true:
 Work through these in order. Do not skip ahead.
 
 ### Dataset Loading and Initial Inspection
-- [ ] Load the dataset and confirm shape (expected: ~1,460 rows training, 79 features)
-- [ ] Print column names and data types
-- [ ] Read the Ames data dictionary for every column you plan to use — do not guess column semantics
-- [ ] Identify which columns are numeric vs. categorical
+- [x] Load the dataset and confirm shape — **1,460 rows × 81 columns** (79 features + `Id` + `SalePrice`)
+- [x] Print column names and data types — 35 numeric, 43 categorical, 3 float64
+- [x] Read the Ames data dictionary for every column you plan to use — do not guess column semantics
+- [x] Identify which columns are numeric vs. categorical — done in `ml/eda.ipynb` Section 2
 
 ### Missing Value Analysis
-- [ ] Count missing values per column
-- [ ] Identify columns with >20% missing — document each one and decide: drop, impute, or keep with special encoding
-- [ ] Distinguish "NA" values that are semantically meaningful (e.g., PoolQC = NA → no pool) from genuine data gaps
-- [ ] Document the imputation strategy for every column that will be used in modeling
+- [x] Count missing values per column — 19 columns have missing values
+- [x] Identify columns with >20% missing — 5 columns: `PoolQC` (~99%), `MiscFeature` (~96%), `Alley` (~93%), `Fence` (~80%), `FireplaceQu` (~47%) — all are Group A (NA = no feature), none are dropped
+- [x] Distinguish "NA" values that are semantically meaningful from genuine data gaps — Group A (encode as `"None"` / binary) vs Group B (impute median/mode)
+- [x] Document the imputation strategy — see `ml/eda.ipynb` Section 4 decision table and `docs/context/assumptions-and-open-questions.md` U-02, U-07, U-10
 
 ### Target Variable Analysis
-- [ ] Plot histogram of `SalePrice`
-- [ ] Plot Q-Q plot of `SalePrice` to assess normality
-- [ ] Compute skewness of `SalePrice`
-- [ ] Decide: should `SalePrice` be log-transformed? Document the decision here: ________________
-- [ ] If log-transforming: confirm predictions will be exponentiated back to USD before returning to the user
+- [x] Plot histogram of `SalePrice` — raw skewness = 1.74 (strong right skew)
+- [x] Plot Q-Q plot of `SalePrice` to assess normality — upper tail curves sharply off the reference line
+- [x] Compute skewness of `SalePrice` — raw = 1.74, log1p = 0.12
+- [x] Decide: should `SalePrice` be log-transformed? **Yes** — log1p applied before training; expm1 applied to predictions before returning to user
+- [x] If log-transforming: confirm predictions will be exponentiated back to USD before returning to the user — confirmed
 
 ### Feature Correlation and Importance
 - [ ] Compute Pearson correlation of all numeric features with `SalePrice`
@@ -139,10 +139,10 @@ Some Ames features are assessor-specific (e.g., `OverallQual` is a 1–10 subjec
 
 > These answers are required inputs for Phase 2. Do not start modeling without them.
 
-1. **Target transform:** Will `SalePrice` be log-transformed? *(answer: ________)*
+1. **Target transform:** Will `SalePrice` be log-transformed? **Yes** — `np.log1p()` applied before training; predictions converted back with `np.expm1()` before returning to the user. Raw skewness = 1.74; log1p skewness = 0.12. See `ml/eda.ipynb` Section 5.
 2. **Outlier policy:** Which (if any) rows will be removed? *(answer: ________)*
 3. **Final feature list:** Which 10–20 features are in the schema? *(answer: see notebook)*
-4. **Imputation strategy per feature:** *(answer: see notebook + updated assumptions doc)*
+4. **Imputation strategy per feature:** Group A (NA = no feature) → encode as `"None"` category or `Has___` binary. Group B (true gaps): `LotFrontage` → median by Neighborhood; `GarageYrBlt` → fill with `YearBuilt`; `Electrical` (1 row) → mode. All statistics computed on training set only inside `sklearn.Pipeline`. See `ml/eda.ipynb` Section 4.
 5. **Required features:** Which schema features are mandatory for prediction to proceed? *(answer: ________)*
 6. **Encoding strategy:** Target encoding, ordinal encoding, or one-hot for categorical features? *(answer: ________)*
 
