@@ -118,7 +118,7 @@ Extract these fields: bedroom_abv_gr (integer), gr_liv_area (float)...
 ```python
 @app.post("/predict")
 def predict(request: PredictRequest):
-    model = joblib.load("model.pkl")  # loaded on every request
+    model = joblib.load("model.joblib")  # loaded on every request
     return model.predict(...)
 ```
 **Why it's wrong:** Model deserialization takes 100ms–500ms. For a synchronous API, doing this on every request adds consistent latency that compounds at scale.

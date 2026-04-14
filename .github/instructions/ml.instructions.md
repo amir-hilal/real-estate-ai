@@ -43,8 +43,8 @@ Before reporting any evaluation metrics, run through the full leakage checklist 
 ## Pipeline Serialization Rules
 
 1. **The preprocessing pipeline and model must be serialized together.** Never serialize the model alone. The sklearn `Pipeline` object wrapping both preprocessor and estimator is the artifact.
-2. **Use `joblib.dump()` to serialize.** Use a fixed filename: `ml/artifacts/model.pkl`.
-3. **Test the serialized artifact in a fresh process.** Load `model.pkl` in a new Python session (no existing variables), call `predict()`, and confirm it runs without errors before considering serialization complete.
+2. **Use `joblib.dump()` to serialize.** Use a fixed filename: `ml/artifacts/model.joblib`.
+3. **Test the serialized artifact in a fresh process.** Load `model.joblib` in a new Python session (no existing variables), call `predict()`, and confirm it runs without errors before considering serialization complete.
 4. **The serialized pipeline must not depend on training data at inference time.** All fitted encoders, scalers, and imputers must be inside the pickle.
 5. **If the feature schema changes, the model must be re-trained.** A model trained on a different feature set than the current `PropertyFeatures` schema is broken — not just suboptimal.
 

@@ -99,7 +99,7 @@ real-estate-ai/
 ├── ml/
 │   ├── eda.ipynb
 │   ├── model_training.ipynb
-│   └── artifacts/             ← model.pkl, training_stats.json
+│   └── artifacts/             ← model.joblib, training_stats.json
 ├── Dockerfile
 ├── docker-compose.yml
 └── .env.example

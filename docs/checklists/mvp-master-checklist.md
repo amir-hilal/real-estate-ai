@@ -63,7 +63,7 @@
 - [ ] Test-set metrics documented: MAE: ________, RMSE: ________, R²: ________
 - [ ] Predicted vs. actual scatter plot reviewed
 - [ ] Feature importances computed and plotted
-- [ ] Model pipeline serialized to `ml/artifacts/model.pkl`
+- [ ] Model pipeline serialized to `ml/artifacts/model.joblib`
 - [ ] Serialized model loads successfully in a fresh Python process
 - [ ] Training statistics computed from training data only
 - [ ] Training statistics file saved to `ml/artifacts/training_stats.json`
