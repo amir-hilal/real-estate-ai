@@ -1,0 +1,202 @@
+# Architecture Decision Records
+
+> **Format:** Lightweight ADR — each decision is recorded when made and never deleted.  
+> **Rule:** Superseded decisions are marked `Superseded by ADR-XXX`, not removed.  
+> **Why this document exists:** Decisions made in moments of clarity must survive moments of confusion.
+
+---
+
+## ADR Template
+
+Use this template for every new entry:
+
+```
+---
+### ADR-XXX — [Title]
+
+**Date:** YYYY-MM-DD  
+**Status:** Proposed | Accepted | Superseded by ADR-XXX | Deprecated  
+**Decided by:** [Person or team]
+
+#### Context
+What situation or constraint led to this decision? What were the competing options?
+
+#### Decision
+What was decided? State it clearly and specifically.
+
+#### Consequences
+What becomes easier, harder, or different as a result of this decision?
+What are the known tradeoffs?
+What is explicitly out of scope as a result?
+```
+
+---
+
+## ADR-001 — Documentation-First Planning Before Any Implementation
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+It is tempting to begin an ML/LLM project by writing code immediately — load the dataset, train a quick model, write a prompt, and iterate from there. This approach optimizes for immediate visible output.
+
+However, this project has multiple interacting stages (LLM extraction → schema validation → ML prediction → LLM explanation → API → UI). Decisions made early in one stage have downstream consequences in all others. For example: the choice of features in Phase 1 determines the Pydantic schema in Phase 3 and the explanation context in Phase 4. Without planning, these dependencies are discovered by breaking things, not by reasoning about them.
+
+The project also has an explicit learning goal: understanding every decision. Documentation-first planning forces decisions to be made consciously and recorded before implementation makes them feel inevitable.
+
+**Considered options:**
+1. Code-first: write code, document later
+2. Documentation-first: plan and document, then implement
+3. Hybrid: plan only the current phase before starting it
+
+#### Decision
+The project will follow a documentation-first approach for all phases. Each phase document must be written, reviewed, and its exit criteria defined before any implementation in that phase begins.
+
+For Phase 1 (EDA), a notebook is the implementation at that stage — but the phase document must define objectives, checklist, and exit criteria before the notebook is opened.
+
+#### Consequences
+- Slower initial visible progress (no code for the first days/weeks)
+- Significantly lower risk of fundamental redesign mid-implementation
+- Every decision has a written rationale before it is encoded in code
+- New contributors (or future-you) can understand every choice without reading code
+- Planning documents become the acceptance criteria, reducing ambiguity
+
+---
+
+## ADR-002 — Synchronous Request Handling for MVP
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+The full pipeline (Stage 1 LLM + ML inference + Stage 2 LLM) is expected to take 3–8 seconds end-to-end. There are two architectural patterns for handling this:
+
+1. **Synchronous:** The HTTP request waits for the full pipeline to complete and returns the result. Simple to implement and debug.
+2. **Asynchronous:** The request returns a job ID immediately; the client polls for results or receives a webhook. Requires a task queue (Celery), message broker (Redis), and additional infrastructure.
+
+#### Decision
+MVP will use synchronous request handling. The full pipeline runs within a single HTTP request/response cycle.
+
+Accepted tradeoffs:
+- Web server workers are held during LLM calls (I/O bound; acceptable with async FastAPI)
+- Perceived latency is 3–8 seconds (acceptable for a demo system)
+- If a user closes the browser, the pipeline continues running in the background (no cancellation mechanism)
+
+#### Consequences
+- Async infrastructure (Celery, Redis, polling endpoints) is explicitly excluded from MVP
+- Latency is accepted as a known constraint, not a bug
+- Any server timeout must be set to at least 30 seconds to avoid request cutoff during LLM calls
+- If production requirements ever include >10 concurrent users or <3s response time SLAs, this decision must be revisited
+
+---
+
+## ADR-003 — Authentication and Background Jobs Excluded from MVP
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+Production systems of this type eventually need user authentication (who is using the system?), authorization (what are they allowed to do?), and background processing (handling multiple users without blocking). These are real requirements in production, but the question is when to introduce them.
+
+**Authentication requirements in MVP:**
+- There is exactly one user: the developer
+- No sensitive data is stored
+- The system runs locally, not on a shared server
+- No access control boundaries exist
+
+**Background job requirements in MVP:**
+- Expected concurrency: 1 request at a time
+- No batch processing pipeline
+- No long-running retraining jobs
+
+#### Decision
+Authentication, authorization, and background job processing (Celery, Redis, task queues) are excluded from MVP scope entirely.
+
+Auth will be revisited when:
+- The system is deployed to a shared or public environment, OR
+- User-specific data needs to be protected or separated
+
+Background processing will be revisited when:
+- Sustained concurrent usage at >5 requests/minute is observed, OR
+- Batch retraining jobs are needed alongside live serving
+
+#### Consequences
+- MVP API is fully open — no API keys, no JWT tokens, no user sessions
+- Any call to the API succeeds regardless of caller identity
+- This is explicitly a security debt, documented and accepted for MVP
+- All future-architecture notes on auth and async are in `docs/context/future-considerations.md`
+
+---
+
+## ADR-004 — Form-Based UI Before Chat-First UI
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+The primary input mechanism for this system is a natural-language property description. This could be implemented as:
+
+1. **Chat UI:** A conversational interface where the user types, the system responds, asks follow-up questions, and iteratively builds the feature set through dialogue
+2. **Form-based UI:** A text area for the description, with a structured fallback form for missing fields
+
+A chat interface feels more natural for LLM-driven products and aligns with consumer familiarity with tools like ChatGPT. However, it introduces significant engineering complexity that is not justified at MVP stage.
+
+**Reasons a chat interface is premature for MVP:**
+- Requires managing conversation state (history, turn tracking, context window)
+- The missing-field collection flow becomes an LLM-driven conversation instead of a simple form — requiring additional prompt engineering for the collection phase itself
+- Results (a numeric prediction + 3 paragraphs) are awkward to display inline in a chat thread
+- A form-based UI can be built significantly faster, allowing focus on the ML/LLM pipeline which is the learning priority
+- The pipeline does not yet have a proven extraction error rate — it is unknown whether conversational clarification is even necessary
+
+#### Decision
+MVP UI will be form-based: a text area for the description, and a structured form for any missing required fields. Chat interface is a post-MVP consideration.
+
+#### Consequences
+- UI implementation time is significantly reduced
+- Missing-field collection is handled through standard HTML form controls, not through conversational back-and-forth
+- The decision can be revisited after Phase 3 testing reveals how often required fields are actually missing
+- If the missing-field rate is very high (>50% of requests), a chat interface may become justified
+
+---
+
+## ADR-005 — Ames Housing Dataset as Training Data
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+A property price prediction model requires labeled training data: properties with known sale prices. Options considered:
+
+1. **Ames Housing dataset:** ~2,900 rows, 79 features, residential sales in Ames, Iowa (2006–2010). Well-documented, widely used in ML education, free to use.
+2. **Zillow / real MLS data:** Real production data; not freely available; licensing restrictions; would require web scraping or API access
+3. **Synthetic data:** Generated artificially; does not reflect real market dynamics; useless for a realistic prediction task
+
+**Reasons for Ames:**
+- Free, publicly available, well-documented
+- Rich enough (79 features) to require real feature selection and engineering decisions
+- Standard enough that public benchmarks exist (useful for sanity-checking metrics)
+- Realistic enough to demonstrate a working prediction system
+
+**Limitations acknowledged:**
+- Small dataset by modern standards (~2,900 rows)
+- Data is from 2006–2010 in one city — predictions are not generalizable to current real estate
+- Some features (e.g., `OverallQual`, assessor-specific ratings) are not naturally describable by a user
+- Missing values in the dataset are semantically meaningful (not random) — requires careful imputation
+
+#### Decision
+Ames Housing dataset is the chosen training dataset for MVP.
+
+#### Consequences
+- The `PropertyFeatures` schema will be based on Ames column definitions
+- Predictions will always be anchored to 2006–2010 Ames, Iowa pricing — this must be disclosed in the UI
+- ML metrics should be compared against public Ames benchmarks for sanity checking
+- If the project later requires a more modern or geographically diverse dataset, the schema and model must both be rebuilt
+
+---
+
+*New ADR entries must be added before any decision is implemented in code. A decision implemented without a record is undocumented technical debt.*
