@@ -72,11 +72,11 @@ Work through these in order. Do not skip ahead.
 - [x] If log-transforming: confirm predictions will be exponentiated back to USD before returning to the user — confirmed
 
 ### Feature Correlation and Importance
-- [ ] Compute Pearson correlation of all numeric features with `SalePrice`
-- [ ] Plot the top 20 most correlated features (bar chart or heatmap)
-- [ ] Identify near-duplicate or redundant features (e.g., TotalBsmtSF vs BsmtFinSF sums)
-- [ ] Fit a quick RandomForest or LightGBM model (no tuning) to get initial feature importances
-- [ ] Confirm or revise the shortlist based on computed importances
+- [x] Compute Pearson correlation of all numeric features with `SalePrice` — top 9 above |r|=0.5: `OverallQual`, `GrLivArea`, `GarageCars`, `GarageArea`, `TotalBsmtSF`, `1stFlrSF`, `FullBath`, `TotRmsAbvGrd`, `YearBuilt`
+- [x] Plot the top 20 most correlated features (bar chart or heatmap) — see `ml/eda.ipynb` Section 6
+- [x] Identify near-duplicate or redundant features — `GarageArea`/`GarageCars` (keep `GarageCars`); `1stFlrSF`/`TotRmsAbvGrd`/`GrLivArea` (keep `GrLivArea`); `BsmtFinSF1`/`BsmtUnfSF`/`TotalBsmtSF` (keep `TotalBsmtSF`)
+- [x] Fit a quick LightGBM model (no tuning) to get initial feature importances — top features confirmed by both methods: `OverallQual`, `GrLivArea`, `GarageCars`, `TotalBsmtSF`, `YearBuilt`, `FullBath`
+- [x] Confirm or revise the shortlist based on computed importances — shortlist to be finalised in Section 9
 
 ### Outlier Analysis
 - [ ] Plot `GrLivArea` vs `SalePrice` — identify any extreme outliers (very large area, very low price)
