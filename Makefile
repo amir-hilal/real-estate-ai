@@ -17,9 +17,7 @@ help: ## Show this help message
 
 install: $(VENV)/bin/activate ## Install all dependencies
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt 2>/dev/null || true
-	$(PIP) install fastapi uvicorn pydantic-settings openai joblib scikit-learn lightgbm
-	$(PIP) install pytest pytest-asyncio
+	$(PIP) install -r requirements.txt
 
 $(VENV)/bin/activate:
 	python3 -m venv $(VENV)
