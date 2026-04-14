@@ -1,6 +1,6 @@
 # Phase 3: LLM Extraction Design (Stage 1)
 
-> **Status:** Not Started  
+> **Status:** Complete  
 > **Depends on:** Phase 2 complete — the `PropertyFeatures` schema is locked before prompts are designed  
 > **Blocks:** Phase 4 (Prediction Interpretation) and Phase 5 (API integration)
 
@@ -169,14 +169,14 @@ Before this phase is considered complete, the following test cases must be run a
 
 Phase 3 is complete only when ALL of the following are true:
 
-1. [ ] Stage 1 prompt is written, versioned, and stored in `prompts/`
-2. [ ] `PropertyFeatures` Pydantic model is finalized (schema locked, matching ML feature list)
-3. [ ] All 10 test queries have been run and results documented in the test log
-4. [ ] T01 passes with ≥8 correctly extracted fields
-5. [ ] T07 and T10 return well-structured null/error responses without crashes
-6. [ ] Validation chain (JSON → Pydantic → required field check) is designed and documented
-7. [ ] All failure modes above have a defined handling path
-8. [ ] Prompt version 1 is committed to version control
+1. [x] Stage 1 prompt is written, versioned, and stored in `prompts/` — `prompts/extraction_v1.md` with guardrail, schema tables, enum mappings, anti-hallucination rules, 3 few-shot examples
+2. [x] `PropertyFeatures` Pydantic model is finalized — `app/schemas/property_features.py` with `Literal` enum types for `Neighborhood` and `Exterior1st`, range constraints on all numeric fields
+3. [x] All 10 test queries have been run and results documented — `tests/test_extraction_integration.py` (11 tests, all passing against Ollama `phi4-mini`)
+4. [x] T01 passes with ≥8 correctly extracted fields — 11/12 fields extracted (only `MasVnrArea` null)
+5. [x] T07 and T10 return well-structured null/error responses without crashes — T07: `TotalBsmtSF=null`, 0 missing required; T10: `is_property_description=false` with redirect message
+6. [x] Validation chain (JSON → Pydantic → required field check) is designed and implemented — `app/services/extraction.py` with field-by-field validation, invalid→null fallback
+7. [x] All failure modes have a defined handling path — retry on bad JSON, nullify invalid fields, `ExtractionError` after 2 failures, guardrail for off-topic input
+8. [x] Prompt version 1 is committed to version control — `prompts/extraction_v1.md`
 
 ---
 
