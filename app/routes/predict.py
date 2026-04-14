@@ -65,6 +65,12 @@ async def predict_route(request: Request, body: PredictRequest) -> PredictRespon
             },
         )
 
+    logger.info(
+        "POST /predict description_len=%d supplemental_keys=%s",
+        len(body.description),
+        list(body.supplemental_features.keys()),
+    )
+
     pipeline = request.app.state.pipeline
     training_stats = request.app.state.training_stats
 
@@ -137,6 +143,7 @@ async def predict_route(request: Request, body: PredictRequest) -> PredictRespon
     from app.services.extraction import _REQUIRED_FIELDS
     missing = [f for f in _REQUIRED_FIELDS if merged.get(f) is None]
     if missing:
+        logger.info("POST /predict status=incomplete missing=%s", missing)
         return PredictResponse(
             status="incomplete",
             features=merged,
@@ -162,6 +169,9 @@ async def predict_route(request: Request, body: PredictRequest) -> PredictRespon
         logger.warning("Explanation generation failed: %s", exc)
         explanation = "Explanation temporarily unavailable."
 
+    logger.info(
+        "POST /predict status=complete prediction_usd=%d", prediction_usd
+    )
     return PredictResponse(
         status="complete",
         features=validated_features.model_dump(),

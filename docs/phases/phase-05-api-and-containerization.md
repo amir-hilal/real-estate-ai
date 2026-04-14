@@ -1,6 +1,6 @@
 # Phase 5: API and Containerization
 
-> **Status:** Not Started  
+> **Status:** Complete  
 > **Depends on:** Phases 1–4 complete (model serialized, prompts validated, schema locked)  
 > **Blocks:** Phase 6 (UI integration)
 
@@ -200,13 +200,13 @@ Before Phase 5 is complete, run the following end-to-end tests:
 
 Phase 5 is complete only when ALL of the following are true:
 
-1. [ ] All endpoints are implemented and return documented response shapes
-2. [ ] Model is loaded at startup; health check confirms it
-3. [ ] All 6 integration tests pass
-4. [ ] `docker-compose up` starts the application with no errors
-5. [ ] All secrets are passed via environment variables, never hardcoded
-6. [ ] Structured logs are emitted for requests and LLM calls
-7. [ ] Full pipeline test (description → prediction + explanation) works end-to-end via curl
+1. [x] All endpoints are implemented and return documented response shapes
+2. [x] Model is loaded at startup; health check confirms it
+3. [x] All 6 integration tests pass (tests/test_api_integration.py, 6/6 green)
+4. [x] `docker-compose up` starts the application with no errors — verified: image built successfully, container started, `GET /health` returns `{"status":"ok","model_loaded":true,"stats_loaded":true}`
+5. [x] All secrets are passed via environment variables, never hardcoded
+6. [x] Structured logs are emitted for requests and LLM calls (request entry/exit in routes + LLM call latency in clients/llm.py)
+7. [x] Full pipeline test (description → prediction + explanation) works end-to-end via curl — verified: `POST /predict` returned `prediction_usd: 256855` with full LLM explanation for a 2,100 sq ft NridgHt property
 
 ---
 

@@ -12,6 +12,8 @@ services:
       PROMPTS_DIR: prompts
       HOST: 0.0.0.0
       PORT: "8000"
+      # Remap Ollama to host network — localhost inside the container is not the host
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
     # Override ENVIRONMENT=production in .env to switch LLM provider
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

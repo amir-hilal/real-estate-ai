@@ -45,6 +45,8 @@ async def extract(request: Request, body: ExtractRequest) -> ExtractResponse:
     - status="partial": some required features missing (listed in missing_required_fields)
     - status="not_a_property": input was not a property description
     """
+    logger.info("POST /extract description_len=%d", len(body.description))
+
     # Load prompt (cached on app.state to avoid disk reads per-request)
     if not hasattr(request.app.state, "extraction_prompt"):
         request.app.state.extraction_prompt = load_extraction_prompt(
@@ -68,18 +70,23 @@ async def extract(request: Request, body: ExtractRequest) -> ExtractResponse:
         )
 
     if not result.is_property_description:
+        logger.info("POST /extract status=not_a_property")
         return ExtractResponse(
             status="not_a_property",
             message=result.message,
         )
 
     if result.missing_required:
+        logger.info(
+            "POST /extract status=partial missing=%s", result.missing_required
+        )
         return ExtractResponse(
             status="partial",
             features=result.features,
             missing_required_fields=result.missing_required,
         )
 
+    logger.info("POST /extract status=complete")
     return ExtractResponse(
         status="complete",
         features=result.features,
