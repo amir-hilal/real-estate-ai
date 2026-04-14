@@ -113,7 +113,7 @@ These are not assumptions — they are open questions that only the data can ans
 ### Before Phase 2 (ML Foundation)
 
 - [x] **Q1:** Which features will be included in the schema? **ANSWERED** — 12 features: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`, `TotalBsmtSF`, `GarageCars`, `FullBath`, `YearRemodAdd`, `Fireplaces`, `LotArea`, `MasVnrArea`, `Exterior1st`. See `ml/eda.ipynb` Section 9 for full schema table.
-- [ ] **Q2:** What is the baseline MAE on Ames using only the top 10 features? (Establishes the target model must beat)
+- [x] **Q2:** What is the baseline MAE? **ANSWERED** — `DummyRegressor(strategy="median")` on the 12-feature schema: MAE = **$59,568**, RMSE = $88,667, R² = -0.025. Final model target: MAE < $30,000 (>49% reduction), R² > 0.85.
 - [x] **Q3:** How will we handle categorical features with rare values that may not appear in production input? **ANSWERED** — `Exterior1st`: values with <10 training rows → binned to `"Other"` before one-hot encoding. `Neighborhood`: unseen values at inference → target encoder falls back to global training mean.
 - [x] **Q4:** Will `SalePrice` be log-transformed? **Yes** — `np.log1p()` before training; `np.expm1()` on predictions. Raw skewness = 1.74, log1p skewness = 0.12. Confirmed via histogram and Q-Q plot in `ml/eda.ipynb` Section 5.
 - [x] **Q5:** What imputation strategy will be used for numeric vs. categorical missing values? **ANSWERED** — Group A (NA = no feature): encode as `"None"` / binary. Group B: numeric → median (train only); categorical → mode (train only). All inside `sklearn.Pipeline`.

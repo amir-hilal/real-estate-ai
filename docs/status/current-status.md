@@ -7,7 +7,7 @@
 
 ## Current Phase
 
-**Phase 0 — Planning and Documentation**  
+**Phase 2 — ML Foundation**  
 Status: **In Progress**
 
 ---
@@ -26,19 +26,17 @@ Status: **In Progress**
 - [x] `docs/roadmap.md` — phased execution roadmap table created
 - [x] `.github/instructions/` — Copilot instruction files created for all categories
 - [x] `.copilot/skills/` — project skill/context files created
+- [x] **Phase 1 complete** — `ml/eda.ipynb` fully executed; all 10 unknowns (U-01–U-10) resolved; 12-feature schema finalized (4 required + 8 optional); all key decisions documented
 
 ---
 
 ## What Is Not Started
 
-- [ ] Phase 1: EDA notebook (`ml/eda.ipynb`) — first hands-on phase
-- [ ] Ames Housing dataset download
-- [ ] `PropertyFeatures` Pydantic schema
-- [ ] All ML training code
-- [ ] All prompt files
-- [ ] All API code
-- [ ] Docker setup
-- [ ] UI
+- [ ] `PropertyFeatures` Pydantic schema (Phase 3)
+- [ ] All prompt files (Phase 3)
+- [ ] All API code (Phase 5)
+- [ ] Docker setup (Phase 5)
+- [ ] UI (Phase 6)
 
 ---
 
@@ -46,18 +44,18 @@ Status: **In Progress**
 
 | ID | Blocker | Impact | Resolution Path |
 |----|---------|--------|----------------|
-| B-01 | Ames Housing dataset not yet downloaded | Phase 1 cannot start | Download from Kaggle or use `openml` Python package |
 | B-02 | LLM API key not yet configured | Phase 3 cannot start | Obtain OpenAI or Anthropic API key; configure `.env` file |
 
 ---
 
 ## Next Actions (in order)
 
-1. **Download the Ames Housing dataset** — Kaggle: [House Prices - Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data) or via `openml.datasets.get_dataset(42165)`
-2. **Save dataset to `ml/data/`** (directory to be created when implementation begins)
-3. **Read the Ames data dictionary** — critical before any EDA code is written
-4. **Open `docs/phases/phase-01-discovery-and-eda.md`** — work through its checklist methodically
-5. **Create `ml/eda.ipynb`** notebook
+1. **Build `ml/model_training.ipynb`** — outlier removal → preprocessing pipeline → DummyRegressor baseline → final model → serialize
+2. **Record baseline MAE** from DummyRegressor — answers Q2
+3. **Train final model** (LightGBM candidate) — evaluate on test set
+4. **Serialize pipeline** to `ml/artifacts/model.pkl`
+5. **Save training stats** to `ml/artifacts/training_stats.json`
+6. **Mark Phase 2 complete** and move to Phase 3 (LLM Extraction)
 
 ---
 
@@ -65,11 +63,11 @@ Status: **In Progress**
 
 | ID | Decision | Required By | Status |
 |----|----------|------------|--------|
-| D-01 | Log-transform `SalePrice` or not | Phase 2 (training) | Open — awaiting EDA histogram |
-| D-02 | Final feature shortlist (10–20 features) | Phase 2 (schema) | Open — awaiting EDA importances |
-| D-03 | Required vs. optional feature classification | Phase 3 (schema lock) | Open — awaiting D-02 |
+| D-01 | Log-transform `SalePrice` or not | Phase 2 (training) | ✅ **Resolved** — `np.log1p()` before training; `np.expm1()` on predictions |
+| D-02 | Final feature shortlist (10–20 features) | Phase 2 (schema) | ✅ **Resolved** — 12 features: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`, `TotalBsmtSF`, `GarageCars`, `FullBath`, `YearRemodAdd`, `Fireplaces`, `LotArea`, `MasVnrArea`, `Exterior1st` |
+| D-03 | Required vs. optional feature classification | Phase 3 (schema lock) | ✅ **Resolved** — Required: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`. Optional: remaining 8. |
 | D-04 | Which LLM provider and model to use | Phase 3 | Open — defaulting to OpenAI GPT-4o; confirm availability |
-| D-05 | Baseline model MAE target | Phase 2 evaluation | Open — awaiting D-02 and baseline run |
+| D-05 | Baseline model MAE target | Phase 2 evaluation | ✅ **Resolved** — Baseline MAE = $59,568 (`DummyRegressor` median). Final model target: MAE < $30,000. |
 | D-06 | Final endpoint structure: one combined `/predict` or separate stage endpoints | Phase 5 | Open — leaning toward one combined endpoint |
 
 ---

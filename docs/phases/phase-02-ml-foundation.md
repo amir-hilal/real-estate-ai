@@ -1,6 +1,6 @@
 # Phase 2: ML Foundation
 
-> **Status:** Not Started  
+> **Status:** In Progress  
 > **Depends on:** Phase 1 EDA complete + feature shortlist finalized  
 > **Blocks:** Phase 3 (LLM Extraction) — the schema is locked after this phase
 
@@ -106,8 +106,18 @@ Document these decisions here once Phase 1 EDA is complete:
 
 | Feature | Missing Value Strategy | Encoding Strategy | Notes |
 |---------|----------------------|-------------------|-------|
-| *(fill in after EDA)* | | | |
-| | | | |
+| `GrLivArea` | None (no missing) | Numeric — no encoding | Required |
+| `OverallQual` | None (no missing) | Numeric — no encoding | Required; 1–10 integer |
+| `YearBuilt` | None (no missing) | Numeric — no encoding | Required |
+| `Neighborhood` | `most_frequent` imputer (0 missing) | `TargetEncoder` (fit on train only) | Required; 25 values |
+| `TotalBsmtSF` | `median` imputer | Numeric — no encoding | Default 0 (no basement) |
+| `GarageCars` | `median` imputer | Numeric — no encoding | Default 0 (no garage) |
+| `FullBath` | `median` imputer | Numeric — no encoding | Default 1 |
+| `YearRemodAdd` | `median` imputer | Numeric — no encoding | Default = YearBuilt at inference |
+| `Fireplaces` | `median` imputer | Numeric — no encoding | Default 0 |
+| `LotArea` | `median` imputer | Numeric — no encoding | Default = neighborhood median |
+| `MasVnrArea` | Fill `0` before pipeline (Group A) | Numeric — no encoding | NA = no veneer → area is 0 |
+| `Exterior1st` | `most_frequent` imputer | `OneHotEncoder` after binning rares (<10 rows → `"Other"`) | Optional; ~10 clean levels after binning |
 
 ### Guiding principles:
 - Choose imputation values (median/mode) from training data only
