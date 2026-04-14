@@ -8,7 +8,7 @@
 ## Current Phase
 
 **Phase 5 — API & Containerization**  
-Status: **Not Started**
+Status: **In Progress**
 
 ---
 
@@ -49,17 +49,25 @@ Status: **Not Started**
   - [x] `tests/test_explanation_integration.py` — 5 evaluation scenarios E01–E05 against Ollama, all passing
   - [x] Total test suite: 62 tests passing (46 unit + 16 integration)
 
----
+- [x] **Phase 5 in progress** — Routes, Dockerfile, docker-compose created; 61 unit tests passing:
+  - [x] `app/routes/extract.py` — `POST /extract` handler (Stage 1 only)
+  - [x] `app/routes/predict.py` — `POST /predict` handler (full pipeline)
+  - [x] `app/main.py` — updated to register routes; `/health` returns `stats_loaded` too
+  - [x] `app/schemas/responses.py` — `ExtractResponse`, `PredictResponse` added; `PredictionResponse` replaced
+  - [x] `app/services/prediction.py` — `_FEATURE_COLUMNS` derived from schema (R-06 resolved)
+  - [x] `tests/test_routes.py` — 15 route unit tests (mocked services, <1s)
+  - [x] `Dockerfile` — multi-stage build (builder + runtime), non-root user
+  - [x] `docker-compose.yml` — single container, env_file, healthcheck
+  - [ ] Integration tests for full HTTP pipeline (end-to-end via running server)
+  - [ ] Docker build verified (`docker-compose up` end-to-end)
 
 ## What Is Not Started
 
-- [ ] API routes (`app/routes/`) — wiring extraction + prediction + explanation into endpoints
-- [ ] Docker setup (`Dockerfile`, `docker-compose.yml`)
+- [ ] HTTP integration tests (full pipeline via running server: `/health`, `/predict`, `/extract`)
+- [ ] Docker build verified end-to-end (`docker-compose up` + curl test)
 - [ ] UI (Phase 6)
 
 ---
-
-## Active Blockers
 
 | ID | Blocker | Impact | Resolution Path |
 |----|---------|--------|----------------|
@@ -69,13 +77,10 @@ Status: **Not Started**
 
 ## Next Actions (in order)
 
-1. **Review Phase 5 document** — `docs/phases/phase-05-api-and-containerization.md`
-2. **Answer D-06** — Confirm endpoint structure: one combined `POST /predict` vs separate stage endpoints (leaning toward combined)
-3. **Create `app/routes/`** — implement `POST /predict` (full pipeline) and `POST /extract` (Stage 1 only); thin handlers delegating to services
-4. **Wire `app/main.py`** — register routes, inject model and stats at startup via lifespan
-5. **Write route tests** — unit tests with mocked services; integration test with full pipeline
-6. **Docker setup** — `Dockerfile`, `docker-compose.yml`, `.env.example` review
-7. **`make api`** — verify server starts and `/health` returns 200
+1. **Run HTTP integration tests** — `POST /predict` full pipeline against real Ollama; `GET /health` with model loaded
+2. **Docker build verification** — `docker-compose build && docker-compose up`; curl `/health` + `/predict`
+3. **Update phase-05 exit criteria** — check off items as they complete
+4. **Begin Phase 6** — UI design and implementation
 
 ---
 
@@ -88,7 +93,7 @@ Status: **Not Started**
 | D-03 | Required vs. optional feature classification | Phase 3 (schema lock) | ✅ **Resolved** — Required: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`. Optional: remaining 8. |
 | D-04 | Which LLM provider and model to use | Phase 3 | ✅ **Resolved** — Ollama `phi4-mini` (dev) + Groq `llama-3.3-70b-versatile` (prod). See ADR-007. |
 | D-05 | Baseline model MAE target | Phase 2 evaluation | ✅ **Resolved** — Baseline MAE = $59,568 (`DummyRegressor` median). Final model target: MAE < $30,000. |
-| D-06 | Final endpoint structure: one combined `/predict` or separate stage endpoints | Phase 5 | Open — leaning toward one combined endpoint |
+| D-06 | Final endpoint structure: one combined `/predict` or separate stage endpoints | Phase 5 | ✅ **Resolved** — Two endpoints: `POST /predict` (full pipeline) and `POST /extract` (Stage 1 only). No separate `/explain` endpoint. |
 
 ---
 
@@ -96,6 +101,8 @@ Status: **Not Started**
 
 | Date | Activity |
 |------|----------|
+| 2026-04-15 | Phase 5 in progress — routes created (`/extract`, `/predict`), schemas updated, `app/main.py` wired, `Dockerfile` + `docker-compose.yml` created, R-04/R-06 closed, Q14-Q16 answered, 15 new route unit tests (61 unit total) |
+| 2026-04-15 | A-12 confirmed (JSON mode reliable); A-15 revised (three-step architecture is a fundamental constraint, not a maintainability preference); R-04 MITIGATED; R-06 MITIGATED |
 | 2026-04-14 | Phase 4 complete — explanation prompt, explanation service, 20 unit + 5 integration tests (E01–E05), all passing; `training_stats.json` extended with `top_features`; E05 grounding check validates no hallucinated statistics |
 | 2026-04-14 | Phase 3 complete — extraction prompt, LLM client, extraction service, 37 tests (26 unit + 11 integration), all passing; `PropertyFeatures` schema hardened with `Literal` enum types; bug caught and fixed by tests |
 | 2026-04-14 | Phase 2 complete — LightGBM model trained, serialized, evaluated; `training_stats.json` saved; all leakage checks passed |

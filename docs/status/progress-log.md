@@ -35,6 +35,45 @@
 
 ---
 
+### 2026-04-15 — Phase 5 In Progress — Routes, Schemas, Docker
+
+**Phase:** Phase 5 — API & Containerization  
+**Duration:** ~1 session  
+**Status change:** Phase 5 Not Started → Phase 5 In Progress
+
+**What was done:**
+- Answered Q14, Q15, Q16 in `docs/context/assumptions-and-open-questions.md`: two endpoints (`POST /predict`, `POST /extract`); directory structure matches `architecture.instructions.md`; model + prompts COPY'd into Docker image at build time
+- Updated `app/schemas/responses.py` — replaced `PredictionResponse` with `ExtractResponse` and `PredictResponse` matching the Phase 5 contract shapes (status field, missing_required_fields, prediction_usd as int)
+- Created `app/routes/extract.py` — `POST /extract` handler: loads/caches prompt from disk, creates LLM client, calls `extract_features()`, maps result to `ExtractResponse` (complete / partial / not_a_property / 422)
+- Created `app/routes/predict.py` — `POST /predict` handler: full pipeline (extraction → merge supplemental → Pydantic validation → ML predict → LLM explain); explanation failure is non-fatal (returns "temporarily unavailable"); 503 if model not loaded
+- Updated `app/main.py` — registered both routers; `/health` now returns `stats_loaded` field and returns 503 if either artifact is absent
+- Fixed `app/schemas/__init__.py` — updated exports to match renamed response models
+- Fixed `app/services/prediction.py` — `_FEATURE_COLUMNS` now derived from `PropertyFeatures.model_fields.keys()` (schema is single source of truth; eliminates R-06 manual sync point)
+- Created `tests/test_routes.py` — 15 route unit tests (mocked via `app.services.extraction.chat_completion` patch path); TestHealthEndpoint (2), TestExtractEndpoint (5), TestPredictEndpoint (8)
+- Created `Dockerfile` — multi-stage build (builder: deps compile; runtime: python:3.12-slim + libgomp1 + non-root user); COPYs `app/`, `prompts/`, `ml/artifacts/`
+- Created `docker-compose.yml` — single container, env_file reference, healthcheck via urllib
+- Updated `docs/context/assumptions-and-open-questions.md` — A-12 CONFIRMED, A-15 REVISED (architectural constraint), R-04 MITIGATED, R-06 MITIGATED, Q14/Q15/Q16 ANSWERED
+- All 61 unit tests passing (<1s); 16 integration tests still passing
+
+**Decisions made:**
+- Two endpoints, not one: `POST /extract` for Stage 1 isolation + `POST /predict` for full pipeline. No `/explain` endpoint — explanation is always bundled with prediction.
+- Explanation failure is non-fatal: the prediction still returns with a fallback message. ML inference is the core deliverable; the explanation enhances it.
+- Prompts loaded lazily and cached on `app.state` at first request (not at startup) — avoids prompt file missing causing startup failure; prompts can be hot-fixed without restart in development.
+- Mock patch path for extraction tests is `app.services.extraction.chat_completion` (not `app.clients.llm.chat_completion`) — `from module import name` creates a local binding; patching the original module does not intercept already-imported names.
+
+**Discoveries / surprises:**
+- `PredictionResponse` import in `app/schemas/__init__.py` broken the test suite immediately after renaming — caught and fixed within the same session.
+- libgomp1 must be present in the runtime Docker image (not just the builder) — LightGBM requires it at inference time, not just at compile time.
+
+**Next session should start with:**
+- HTTP integration tests for the full pipeline via running server (Phase 5 exit criterion 3)
+- Docker build + `docker-compose up` + curl `/health` and `POST /predict` end-to-end verification
+
+**Blockers:**
+- None
+
+---
+
 ### 2026-04-14 — Phase 4 Complete — Explanation Pipeline + Evaluation Scenarios
 
 **Phase:** Phase 4 — Prediction Interpretation  

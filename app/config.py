@@ -27,7 +27,6 @@ class Settings(BaseSettings):
 
     # Prompts directory
     prompts_dir: Path = Path("prompts")
-
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
