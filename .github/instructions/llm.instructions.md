@@ -102,12 +102,13 @@ Include this explicitly:
 
 ## LLM Client Code Rules
 
-1. **Use the official SDK** (openai, anthropic, etc.) — do not make raw HTTP calls to LLM APIs
+1. **Use the `openai` Python SDK as a universal client** — both Ollama (dev) and Groq (prod) expose OpenAI-compatible APIs. The same `openai.AsyncOpenAI(base_url=..., api_key=...)` client works for both.
 2. **The API client is injected, not instantiated inline** — pass it as a parameter to functions for testability
 3. **Log every LLM call:** timestamp, model name, prompt version, response latency, status (success/failure)
-4. **Set explicit timeout on all LLM calls** — never wait indefinitely for a response
+4. **Set explicit timeout on all LLM calls** — use `settings.llm_timeout`; never wait indefinitely for a response
 5. **Do not log full prompt content by default** — it may contain user data. Log prompt version and length only.
 6. **Handle rate limits explicitly:** implement at most one retry with a brief delay. Do not implement exponential backoff for MVP (too complex).
+7. **Provider switching is via config only** — no code branching for Ollama vs Groq. The `settings.llm_base_url`, `settings.llm_model`, `settings.llm_api_key` properties handle the selection.
 
 ---
 

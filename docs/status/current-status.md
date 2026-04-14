@@ -48,7 +48,7 @@ Status: **In Progress**
 
 | ID | Blocker | Impact | Resolution Path |
 |----|---------|--------|----------------|
-| B-02 | LLM API key not yet configured | Phase 3 cannot start | Obtain OpenAI or Anthropic API key; configure `.env` file |
+| ~~B-02~~ | ~~LLM API key not yet configured~~ | ~~Phase 3 cannot start~~ | **Resolved** — Development uses Ollama (local, no key needed). Groq key needed only for production. See ADR-007. |
 
 ---
 
@@ -72,7 +72,7 @@ Status: **In Progress**
 | D-01 | Log-transform `SalePrice` or not | Phase 2 (training) | ✅ **Resolved** — `np.log1p()` before training; `np.expm1()` on predictions |
 | D-02 | Final feature shortlist (10–20 features) | Phase 2 (schema) | ✅ **Resolved** — 12 features: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`, `TotalBsmtSF`, `GarageCars`, `FullBath`, `YearRemodAdd`, `Fireplaces`, `LotArea`, `MasVnrArea`, `Exterior1st` |
 | D-03 | Required vs. optional feature classification | Phase 3 (schema lock) | ✅ **Resolved** — Required: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`. Optional: remaining 8. |
-| D-04 | Which LLM provider and model to use | Phase 3 | Open — defaulting to OpenAI GPT-4o; confirm availability |
+| D-04 | Which LLM provider and model to use | Phase 3 | ✅ **Resolved** — Ollama `phi4-mini` (dev) + Groq `llama-3.3-70b-versatile` (prod). See ADR-007. |
 | D-05 | Baseline model MAE target | Phase 2 evaluation | ✅ **Resolved** — Baseline MAE = $59,568 (`DummyRegressor` median). Final model target: MAE < $30,000. |
 | D-06 | Final endpoint structure: one combined `/predict` or separate stage endpoints | Phase 5 | Open — leaning toward one combined endpoint |
 

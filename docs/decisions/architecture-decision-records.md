@@ -200,3 +200,64 @@ Ames Housing dataset is the chosen training dataset for MVP.
 ---
 
 *New ADR entries must be added before any decision is implemented in code. A decision implemented without a record is undocumented technical debt.*
+
+---
+
+## ADR-006 — LightGBM as Final ML Model
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+Phase 2 required selecting a regression model for Ames Housing price prediction. The model must work with 12 features (4 required + 8 optional), handle mixed numeric/categorical inputs via a scikit-learn Pipeline, and beat the DummyRegressor baseline (MAE = $59,568) by at least 30%.
+
+**Alternatives considered:**
+1. **Ridge Regression** — fast, interpretable, but linear only; cannot capture the non-linear neighborhood and quality interactions visible in EDA
+2. **Random Forest** — non-linear, robust; generally slightly worse than gradient-boosted trees on structured tabular data
+3. **XGBoost** — strong candidate; similar performance profile to LightGBM but slower training on small datasets
+4. **LightGBM** — gradient-boosted trees optimized for speed; native categorical support (not used here due to Pipeline constraints, but available for future work)
+
+#### Decision
+LightGBM (`LGBMRegressor`) is the final model. Parameters: `n_estimators=500, learning_rate=0.05, num_leaves=31, random_state=42`.
+
+Test-set results: MAE = $17,936 (69.9% improvement over baseline), RMSE = $29,238, R² = 0.8885. All Phase 2 targets exceeded.
+
+#### Consequences
+- `lightgbm` is a required dependency (must be pinned in `requirements.txt`)
+- Model is serialized as part of an `sklearn.Pipeline` via `joblib` — LightGBM version must be consistent between training and inference environments
+- Train/test MAE gap is 72% ($5,029 vs $17,936) — acceptable overfitting for MVP; regularization can be explored post-MVP if needed
+- `OverallQual` dominates feature importance (gain ~875) — the model is heavily dependent on this single feature
+
+---
+
+## ADR-007 — Ollama (Development) + Groq (Production) as LLM Providers
+
+**Date:** 2026-04-14  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+The pipeline requires two LLM calls per request: Stage 1 (feature extraction) and Stage 3 (explanation generation). A provider must be chosen for development and production use.
+
+**Alternatives considered:**
+1. **OpenAI (GPT-4o)** — highest quality; expensive per-call; requires API key for all environments including development
+2. **Anthropic (Claude)** — comparable quality; same cost and key-dependency issues as OpenAI
+3. **Ollama (local)** — free, no API key, runs locally, good for development iteration; limited model quality for small models; latency depends on hardware
+4. **Groq** — hosted inference with very fast response times; free tier available; supports Llama 3.3 70B and other open models; OpenAI-compatible API
+
+**Key insight:** Both Ollama and Groq expose OpenAI-compatible REST APIs. The `openai` Python SDK works with both by changing only `base_url` and `api_key`. This means the same client code serves both environments with zero code branching.
+
+#### Decision
+- **Development:** Ollama with `phi4-mini` (local, free, no API key required)
+- **Production:** Groq with `llama-3.3-70b-versatile` (hosted, fast inference, OpenAI-compatible)
+- Environment selection via `ENVIRONMENT` variable (`development` | `production`)
+- Client code uses the `openai` Python SDK with environment-dependent `base_url`
+
+#### Consequences
+- No OpenAI or Anthropic dependency or cost — significant simplification
+- Development can proceed without any API key (Ollama is local and free)
+- B-02 blocker (LLM API key) is resolved for development; Groq key needed only for production deployment
+- Prompt quality may differ between `phi4-mini` (3.8B params) and `llama-3.3-70b` — prompts must be tested on both
+- The `openai` Python package is still a dependency (used as a universal client), but OpenAI's API is not called
+- If Groq's free tier is insufficient for production, switching to another OpenAI-compatible provider (Together AI, Fireworks, etc.) requires only changing env vars

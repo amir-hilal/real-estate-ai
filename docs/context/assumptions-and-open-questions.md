@@ -36,7 +36,7 @@
 
 | ID | Assumption | Basis | Risk if Wrong |
 |----|-----------|-------|---------------|
-| A-11 | GPT-4o (or an equivalent capable LLM with structured output support) is available and accessible via API key | OpenAI / Anthropic API access assumed | If only open-source models are available, JSON-mode reliability and instruction-following quality may drop significantly |
+| A-11 | ~~GPT-4o (or an equivalent capable LLM with structured output support) is available and accessible via API key~~ **REVISED** — Using Ollama (`phi4-mini`) for development (local, free) and Groq (`llama-3.3-70b-versatile`) for production. Both expose OpenAI-compatible APIs; the `openai` Python SDK works with both. See ADR-007. | ADR-007, 2026-04-14 | If Groq's free tier has insufficient quota, switch to another OpenAI-compatible provider via env vars only |
 | A-12 | Structured JSON output mode (e.g., OpenAI response_format=json, function calling, or Pydantic AI) is reliable enough for Stage 1 extraction | Documented capability | May require retry logic or more rigid prompting if JSON errors occur |
 | A-13 | Stage 1 LLM can reliably extract the 10–15 most important Ames features from a user's plain-English description | Based on LLM instruction-following capability | Some features may require more explicit prompting; test cases will validate this |
 | A-14 | Stage 2 LLM will not hallucinate statistics if the prompt explicitly provides the correct values in context | Grounding via in-context data reduces hallucination | Must be validated in Phase 4; spot-checking explanations against actual stats is required |
@@ -100,9 +100,9 @@ These are not assumptions — they are open questions that only the data can ans
 
 | Dependency | Required By | Risk | Fallback |
 |------------|------------|------|---------|
-| OpenAI / Anthropic API access | Phase 3, Phase 4 | API key invalid or quota exceeded | Use Ollama (local models) with a JSON-schema prompt |
+| OpenAI / Anthropic API access | Phase 3, Phase 4 | API key invalid or quota exceeded | **Revised** — Using Ollama (dev, no key) + Groq (prod). If Groq is unavailable, switch to another OpenAI-compatible provider via env vars. |
 | Ames Housing dataset availability | Phase 1 | Dataset pulled from Kaggle/OpenML | Mirror locally; do not depend on live URL |
-| scikit-learn, XGBoost, Pydantic | Phase 2, 3 | Version incompatibilities via pip | Pin all versions in requirements.txt from the start |
+| scikit-learn, LightGBM, Pydantic | Phase 2, 3 | Version incompatibilities via pip | Pin all versions in requirements.txt from the start |
 
 ---
 
@@ -124,7 +124,7 @@ These are not assumptions — they are open questions that only the data can ans
 - [x] **Q7:** Which features are "required" (prediction cannot proceed without them) vs "optional"? **ANSWERED** — Required: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood` (no sensible default exists for these). Optional: remaining 8 features — each has a documented default value. UI shows accuracy hint for missing optionals; context-aware hint for `YearRemodAdd` when `YearBuilt < 1990`.
 - [ ] **Q8:** What is the exact JSON structure the Stage 1 prompt must return?
 - [ ] **Q9:** How do we handle a property description that contains no extractable structured data?
-- [ ] **Q10:** Which LLM provider and model will be used? Is structured output mode available?
+- [x] **Q10:** Which LLM provider and model will be used? Is structured output mode available? **ANSWERED** — Ollama `phi4-mini` (dev) + Groq `llama-3.3-70b-versatile` (prod). Both expose OpenAI-compatible APIs. JSON mode available via `response_format={"type": "json_object"}`. See ADR-007.
 
 ### Before Phase 4 (Prediction Interpretation)
 

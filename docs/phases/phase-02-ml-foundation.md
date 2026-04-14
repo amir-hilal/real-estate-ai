@@ -184,7 +184,7 @@ Phase 2 is complete only when ALL of the following are true:
 5. [x] The model is serialized and loads correctly in a fresh Python process — verified `Match: True`
 6. [x] Training statistics file exists and contains at minimum: median SalePrice, mean SalePrice, std SalePrice
 7. [x] Feature importance analysis is complete and documented — Section 5 of `ml/model_training.ipynb`
-8. [ ] Model selection rationale has an ADR entry — *add ADR-006 next*
+8. [x] Model selection rationale has an ADR entry — **ADR-006 (LightGBM selection)**
 
 ---
 
