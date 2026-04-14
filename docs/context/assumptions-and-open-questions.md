@@ -134,9 +134,9 @@ These are not assumptions — they are open questions that only the data can ans
 
 ### Before Phase 5 (API & Containerization)
 
-- [ ] **Q14:** Will there be one combined endpoint (`POST /predict`) or separate stage endpoints?
-- [ ] **Q15:** What is the final directory structure for the application code?
-- [ ] **Q16:** How will the model artifact and prompts be loaded into the Docker container?
+- [x] **Q14:** Will there be one combined endpoint (`POST /predict`) or separate stage endpoints? **ANSWERED** — Two endpoints: `POST /predict` runs the full pipeline (extract → validate → predict → explain); `POST /extract` runs Stage 1 only (for UI pre-validation and testing Stage 1 in isolation). No separate `/explain` endpoint — the explanation is always bundled with the prediction. Per architecture.instructions.md.
+- [x] **Q15:** What is the final directory structure for the application code? **ANSWERED** — `app/main.py` (factory + lifespan), `app/config.py` (Settings), `app/routes/` (thin handlers), `app/services/` (pipeline stages), `app/schemas/` (Pydantic models), `app/clients/` (LLM client). Matches architecture.instructions.md file organization.
+- [x] **Q16:** How will the model artifact and prompts be loaded into the Docker container? **ANSWERED** — `ml/artifacts/` and `prompts/` are COPY'd into the image at build time. `MODEL_PATH` and `STATS_PATH` env vars configure the paths inside the container, defaulting to `/app/ml/artifacts/`. No volume mounts required for the artifact — the image is self-contained.
 
 ---
 

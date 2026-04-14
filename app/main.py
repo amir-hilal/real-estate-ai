@@ -6,7 +6,6 @@ and stored in app.state. Route handlers access it from there — it is never
 loaded inside a request handler.
 """
 
-import json
 import logging
 from contextlib import asynccontextmanager
 
@@ -40,14 +39,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from app.routes.extract import router as extract_router
+from app.routes.predict import router as predict_router
+
+app.include_router(extract_router)
+app.include_router(predict_router)
+
 
 @app.get("/health")
 async def health():
     pipeline_loaded = hasattr(app.state, "pipeline") and app.state.pipeline is not None
-    return {"status": "ok", "model_loaded": pipeline_loaded}
-
-
-# Routes are registered here as they are implemented.
-# from app.routes import predict_router, extract_router
-# app.include_router(predict_router)
-# app.include_router(extract_router)
+    stats_loaded = hasattr(app.state, "training_stats") and app.state.training_stats is not None
+    status_code = 200 if (pipeline_loaded and stats_loaded) else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if status_code == 200 else "unavailable",
+            "model_loaded": pipeline_loaded,
+            "stats_loaded": stats_loaded,
+        },
+    )
