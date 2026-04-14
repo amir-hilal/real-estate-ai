@@ -62,9 +62,27 @@ def build_explanation_prompt(
     else:
         neighborhood_stat_line = ""
 
-    # --- Top factors (top 3, human-readable) ---
-    top_features = training_stats.get("top_features", [])
-    top_factors_list = ", ".join(top_features[:3]) if top_features else "overall quality, living area, location"
+    # --- Top factors (top 3, human-readable names) ---
+    _DISPLAY_NAMES = {
+        "OverallQual": "overall quality",
+        "GrLivArea": "above-grade living area",
+        "Neighborhood": "neighborhood location",
+        "TotalBsmtSF": "basement size",
+        "GarageCars": "garage capacity",
+        "FullBath": "full bathrooms",
+        "YearRemodAdd": "remodel year",
+        "YearBuilt": "year built",
+        "Fireplaces": "number of fireplaces",
+        "MasVnrArea": "masonry veneer area",
+        "Exterior1st": "exterior material",
+        "LotArea": "lot size",
+    }
+    top_features_raw = training_stats.get("top_features", [])
+    top_factors_list = (
+        ", ".join(_DISPLAY_NAMES.get(f, f) for f in top_features_raw[:3])
+        if top_features_raw
+        else "overall quality, living area, neighborhood location"
+    )
 
     # --- Property lines (non-null fields only) ---
     property_lines = _format_property_lines(features)
