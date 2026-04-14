@@ -1,5 +1,17 @@
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
+
+VALID_NEIGHBORHOODS = Literal[
+    "Blmngtn", "Blueste", "BrDale", "BrkSide", "ClearCr", "CollgCr",
+    "Crawfor", "Edwards", "Gilbert", "IDOTRR", "MeadowV", "Mitchel",
+    "NAmes", "NoRidge", "NPkVill", "NridgHt", "NWAmes", "OldTown",
+    "SWISU", "Sawyer", "SawyerW", "Somerst", "StoneBr", "Timber", "Veenker",
+]
+
+VALID_EXTERIORS = Literal[
+    "VinylSd", "HdBoard", "MetalSd", "Wd Sdng", "Plywood", "CemntBd",
+    "BrkFace", "WdShing", "Stucco", "AsbShng", "Other",
+]
 
 
 class PropertyFeatures(BaseModel):
@@ -31,15 +43,9 @@ class PropertyFeatures(BaseModel):
         le=2025,
         description="Year the house was originally constructed",
     )
-    Neighborhood: str = Field(
+    Neighborhood: VALID_NEIGHBORHOODS = Field(
         ...,
-        description=(
-            "Physical location within Ames city limits. "
-            "Valid values: Blmngtn, Blueste, BrDale, BrkSide, ClearCr, CollgCr, "
-            "Crawfor, Edwards, Gilbert, IDOTRR, MeadowV, Mitchel, NAmes, NoRidge, "
-            "NPkVill, NridgHt, NWAmes, OldTown, SWISU, Sawyer, SawyerW, Somerst, "
-            "StoneBr, Timber, Veenker"
-        ),
+        description="Physical location within Ames city limits.",
     )
 
     # --- Optional (Tier 2) — imputed by pipeline if None ---
@@ -85,11 +91,7 @@ class PropertyFeatures(BaseModel):
         le=2000,
         description="Masonry veneer area in square feet (0 if none)",
     )
-    Exterior1st: Optional[str] = Field(
+    Exterior1st: Optional[VALID_EXTERIORS] = Field(
         default=None,
-        description=(
-            "Exterior covering on house. "
-            "Valid values: VinylSd, HdBoard, MetalSd, Wd Sdng, Plywood, CemntBd, "
-            "BrkFace, WdShing, Stucco, AsbShng, Other"
-        ),
+        description="Exterior covering on house.",
     )
