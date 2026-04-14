@@ -12,11 +12,11 @@
 
 | ID | Assumption | Basis | Risk if Wrong |
 |----|-----------|-------|---------------|
-| A-01 | The Ames Housing dataset is available in full from a public source (Kaggle, OpenML, or equivalent) | Common in ML education | Must find alternative dataset; schema redesign required |
-| A-02 | The target variable is `SalePrice` (continuous, USD) | Standard Ames dataset definition | If dataset variant differs, target column name and scale must be re-verified |
-| A-03 | The dataset contains approximately 2,900 rows and 79+ features | Public documentation | Feature selection plan may change significantly with different dimensionality |
+| A-01 | ~~The Ames Housing dataset is available in full from a public source (Kaggle, OpenML, or equivalent)~~ **CONFIRMED** — Downloaded from OpenML ID 42165, saved locally at `ml/data/ames.csv`. No live URL dependency. | Verified 2026-04-14 | N/A |
+| A-02 | ~~The target variable is `SalePrice` (continuous, USD)~~ **CONFIRMED** — `SalePrice` present, range $34,900–$755,000, median $163,000. | Verified 2026-04-14 | N/A |
+| A-03 | ~~The dataset contains approximately 2,900 rows and 79+ features~~ **CORRECTED** — Actual shape is 1,460 rows × 81 columns (79 features + `Id` + `SalePrice`). The 2,900-row figure refers to the combined train+test split used in some Kaggle versions; we have the training portion only. | Verified 2026-04-14 | Feature plan unchanged — 1,460 rows is sufficient for the MVP model. |
 | A-04 | There are meaningful categorical features (neighborhood, building class, etc.) that require encoding — not just numeric features | Dataset documentation | Encoding strategy must be revisited |
-| A-05 | Missing values exist in the dataset and are meaningful (e.g., "NA" for no garage, not a data error) | Ames dataset is well-documented | Imputation strategy changes significantly if missing values are truly random |
+| A-05 | ~~Missing values exist in the dataset and are meaningful (e.g., "NA" for no garage, not a data error)~~ **CONFIRMED** — Two distinct groups identified: (1) ~19 columns where NA = feature doesn't exist on the property (PoolQC, Alley, FireplaceQu, Garage cols, Bsmt cols, etc.) — these are encoded as `"None"` or binary `Has___` columns, not imputed; (2) true data gaps (LotFrontage, GarageYrBlt, Electrical) — imputed with median/mode from training set only. | Verified 2026-04-14 | N/A |
 | A-06 | There are no obvious target-leaking features in the raw dataset that cannot be identified through careful EDA | General knowledge | Could invalidate model metrics if leakage is later discovered |
 
 ---
@@ -71,15 +71,15 @@ These are not assumptions — they are open questions that only the data can ans
 | ID | Unknown | How to Resolve | Phase |
 |----|---------|----------------|-------|
 | U-01 | Which features have the strongest correlation with `SalePrice`? | Compute correlation matrix; plot feature importances from a rough model | Phase 1 |
-| U-02 | How severe is the missing-value problem? Which columns have >20% missing? | Missing value analysis by column | Phase 1 |
+| U-02 | ~~How severe is the missing-value problem? Which columns have >20% missing?~~ **RESOLVED** — 5 columns exceed 20% missing: `PoolQC` (~99%), `MiscFeature` (~96%), `Alley` (~93%), `Fence` (~80%), `FireplaceQu` (~47%). All are Group A (NA = no feature) — none are dropped. | Phase 1 ✅ |
 | U-03 | Is `SalePrice` normally distributed or does it need a log transform? | Plot histogram and Q-Q plot of target variable | Phase 1 |
 | U-04 | Which categorical features have high cardinality (>20 unique values)? | Count unique values per categorical column | Phase 1 |
 | U-05 | Are there outlier properties in the dataset that should be excluded from training? | Scatter plot: SalePrice vs GrLivArea; identify extreme cheap/large properties | Phase 1 |
 | U-06 | Which 10–15 features will the LLM schema focus on? | Determined after U-01 and U-02 are resolved | Phase 1 → Phase 3 |
-| U-07 | What Ames-specific missing value codes mean semantically (e.g., NA = no garage)? | Read Ames dataset data dictionary | Phase 1 |
+| U-07 | ~~What Ames-specific missing value codes mean semantically (e.g., NA = no garage)?~~ **RESOLVED** — NA in quality/condition/type columns means the feature is absent from the property, not a data recording error. These values carry predictive signal and must be preserved as a distinct `"None"` category or binary `Has___` column. See `ml/eda.ipynb` Section 4 decision table. | Phase 1 ✅ |
 | U-08 | Does neighborhood have a strong price effect? Is it a required feature in the schema? | Box plot of SalePrice by Neighborhood | Phase 1 |
 | U-09 | Are there features that are near-duplicates (e.g., TotalBsmtSF vs BsmtFinSF1 + BsmtFinSF2)? | Correlation heatmap and domain review | Phase 1 |
-| U-10 | What should the imputation strategy be for each category of missing values? | Determined by U-07 and U-02 combined | Phase 1 |
+| U-10 | ~~What should the imputation strategy be for each category of missing values?~~ **RESOLVED** — Group A (NA = no feature): encode as `"None"` or binary `Has___` — no imputation. Group B (true gaps): `LotFrontage` → median by Neighborhood; `GarageYrBlt` → fill with `YearBuilt`; `Electrical` (1 row) → mode. All statistics computed on training set only inside a `sklearn.Pipeline`. | Phase 1 ✅ |
 
 ---
 
@@ -116,7 +116,7 @@ These are not assumptions — they are open questions that only the data can ans
 - [ ] **Q2:** What is the baseline MAE on Ames using only the top 10 features? (Establishes the target model must beat)
 - [ ] **Q3:** How will we handle categorical features with rare values that may not appear in production input?
 - [ ] **Q4:** Will `SalePrice` be log-transformed? (Confirm via EDA histogram + Q-Q plot)
-- [ ] **Q5:** What imputation strategy will be used for numeric vs. categorical missing values?
+- [x] **Q5:** What imputation strategy will be used for numeric vs. categorical missing values? **ANSWERED** — Group A (NA = no feature): encode as `"None"` / binary. Group B: numeric → median (train only); categorical → mode (train only). All inside `sklearn.Pipeline`.
 
 ### Before Phase 3 (LLM Extraction Design)
 
