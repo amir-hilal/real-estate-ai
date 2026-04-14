@@ -131,7 +131,7 @@ The API must not:
 
 ## Model Loading Expectations
 
-- The serialized model pipeline (`model.pkl`) is loaded once at application startup via FastAPI's `lifespan` context
+- The serialized model pipeline (`model.joblib`) is loaded once at application startup via FastAPI's `lifespan` context
 - The training statistics file (`training_stats.json`) is loaded at startup and held in memory
 - If the model file is missing or corrupt at startup, the application raises a fatal error and does not start
 - The model path must be configurable via environment variable `MODEL_PATH`
@@ -153,10 +153,10 @@ Model deserialization is expensive (100ms–500ms depending on model size). Load
 
 ### Environment variable handling
 - `OPENAI_API_KEY` (or equivalent LLM key): passed via `.env` file referenced in `docker-compose.yml`
-- `MODEL_PATH`: default to `/app/ml/artifacts/model.pkl`
+- `MODEL_PATH`: default to `/app/ml/artifacts/model.joblib`
 - `STATS_PATH`: default to `/app/ml/artifacts/training_stats.json`
-- `STAGE1_PROMPT_PATH`: default to `/app/prompts/stage1_extraction_v1.md`
-- `STAGE2_PROMPT_PATH`: default to `/app/prompts/stage2_explanation_v1.md`
+- `EXTRACTION_PROMPT_PATH`: default to `/app/prompts/extraction_v1.md`
+- `EXPLANATION_PROMPT_PATH`: default to `/app/prompts/explanation_v1.md`
 
 ### Security note
 - `.env` files must be listed in `.gitignore`

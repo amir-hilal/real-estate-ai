@@ -38,10 +38,10 @@ Before the demo, confirm every artifact is present and usable:
 |----------|----------|--------|
 | EDA notebook | `ml/eda.ipynb` | Runs end-to-end without errors; EDA summary section present |
 | ML training notebook | `ml/model_training.ipynb` | Runs end-to-end; metrics documented; leakage checklist complete |
-| Serialized model | `ml/artifacts/model.pkl` | Loads successfully in fresh Python process |
+| Serialized model | `ml/artifacts/model.joblib` | Loads successfully in fresh Python process |
 | Training statistics | `ml/artifacts/training_stats.json` | Valid JSON; contains at minimum median, mean, std of SalePrice |
-| Stage 1 prompt | `prompts/stage1_extraction_v1.md` | Present; readable; version number in header |
-| Stage 2 prompt | `prompts/stage2_explanation_v1.md` | Present; readable; contains grounding instructions |
+| Extraction prompt | `prompts/extraction_v1.md` | Present; readable; version number in header |
+| Explanation prompt | `prompts/explanation_v1.md` | Present; readable; contains grounding instructions |
 | Docker setup | `Dockerfile`, `docker-compose.yml` | `docker-compose up` works on clean pull |
 | `.env.example` | Project root | Contains all required env variable names (no values) |
 | README | `README.md` | Complete; phases listed; definition of done updated |
@@ -86,7 +86,7 @@ Expected: Structured error response, not a crash
 - [ ] Show the extracted features panel for Input 1
 - [ ] Show the EDA notebook and identify the most predictive features
 - [ ] Show the training metrics from the ML notebook
-- [ ] Show the Stage 1 prompt file and explain its structure
+- [ ] Show the extraction prompt file and explain its structure
 
 ---
 

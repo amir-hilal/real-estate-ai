@@ -19,7 +19,7 @@ LLMs are not deterministic. They can return malformed JSON, values outside expec
 ## Prompt File Rules
 
 1. **Prompts are versioned files, not embedded strings.** All prompts live in `prompts/`.
-2. **File naming convention:** `stage1_extraction_v1.md`, `stage2_explanation_v1.md`
+2. **File naming convention:** `extraction_v1.md`, `explanation_v1.md`
 3. **Increment the version number** when the prompt changes in a way that could affect output. Do not edit a prompt in-place and forget to version it.
 4. **Old prompt versions are never deleted.** They are the history of what was tried and why it changed.
 5. **The active prompt version is configured via environment variable**, not hardcoded.

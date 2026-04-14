@@ -116,11 +116,11 @@ This stage is not an LLM call. It is a validation-driven UI interaction. The ML 
 | Deliverable | Description |
 |-------------|-------------|
 | `PropertyFeatures` schema | Pydantic model with all ML-required features, types, and constraints |
-| Stage 1 prompt | Versioned extraction prompt with clear output format instructions |
+| Extraction prompt | Versioned extraction prompt with clear output format instructions |
 | ML training notebook | Documented EDA → preprocessing → training → evaluation notebook |
 | Serialized model artifact | Trained model + preprocessing pipeline saved as a file |
 | Training statistics file | Summary stats (mean, median, std, percentiles) for key features — used in Stage 2 |
-| Stage 2 prompt | Versioned explanation prompt with grounding instructions |
+| Explanation prompt | Versioned explanation prompt with grounding instructions |
 | FastAPI application | Endpoints: POST /extract, POST /predict, POST /explain (or a combined POST /run) |
 | Docker setup | Dockerfile + docker-compose.yml to run the full system |
 | Test cases | At least 3 complete end-to-end test inputs with expected behavior documented |

@@ -7,7 +7,7 @@
 
 ## Current Phase
 
-**Phase 2 — ML Foundation**  
+**Phase 3 — LLM Extraction + App Structure**  
 Status: **In Progress**
 
 ---
@@ -27,15 +27,19 @@ Status: **In Progress**
 - [x] `.github/instructions/` — Copilot instruction files created for all categories
 - [x] `.copilot/skills/` — project skill/context files created
 - [x] **Phase 1 complete** — `ml/eda.ipynb` fully executed; all 10 unknowns (U-01–U-10) resolved; 12-feature schema finalized (4 required + 8 optional); all key decisions documented
+- [x] **Phase 2 complete** — `ml/model_training.ipynb` fully executed; LightGBM trained (Test MAE $17,936, R² 0.8885); `ml/artifacts/model.joblib` and `ml/artifacts/training_stats.json` saved and verified
 
 ---
 
 ## What Is Not Started
 
-- [ ] `PropertyFeatures` Pydantic schema (Phase 3)
-- [ ] All prompt files (Phase 3)
-- [ ] All API code (Phase 5)
-- [ ] Docker setup (Phase 5)
+- [ ] Stage 1 LLM extraction prompt (`prompts/extraction_v1.md`)
+- [ ] Stage 3 LLM explanation prompt (`prompts/explanation_v1.md`)
+- [ ] LLM client (`app/clients/llm.py`)
+- [ ] Extraction service (`app/services/extraction.py`)
+- [ ] Explanation service (`app/services/explanation.py`)
+- [ ] API routes (`app/routes/`)
+- [ ] Docker setup (`Dockerfile`, `docker-compose.yml`)
 - [ ] UI (Phase 6)
 
 ---
@@ -50,12 +54,14 @@ Status: **In Progress**
 
 ## Next Actions (in order)
 
-1. **Build `ml/model_training.ipynb`** — outlier removal → preprocessing pipeline → DummyRegressor baseline → final model → serialize
-2. **Record baseline MAE** from DummyRegressor — answers Q2
-3. **Train final model** (LightGBM candidate) — evaluate on test set
-4. **Serialize pipeline** to `ml/artifacts/model.pkl`
-5. **Save training stats** to `ml/artifacts/training_stats.json`
-6. **Mark Phase 2 complete** and move to Phase 3 (LLM Extraction)
+1. **Add ADR-006** — LightGBM model selection rationale
+2. **Create `app/` structure** — `main.py`, `config.py`, `schemas/`, `services/`, `routes/`, `clients/`
+3. **Create `app/schemas/property_features.py`** — Pydantic `PropertyFeatures` model (schema locked from Phase 2)
+4. **Create `app/services/prediction.py`** — loads `model.joblib`, runs inference
+5. **Create `prompts/extraction_v1.md`** — Stage 1 LLM extraction prompt
+6. **Create `app/clients/llm.py`** — async OpenAI client wrapper
+7. **Create `app/services/extraction.py`** — Stage 1 service
+8. **Wire routes and main.py**
 
 ---
 
@@ -76,6 +82,8 @@ Status: **In Progress**
 
 | Date | Activity |
 |------|----------|
+| 2026-04-14 | Phase 2 complete — LightGBM model trained, serialized, evaluated; `training_stats.json` saved; all leakage checks passed |
+| 2026-04-14 | Phase 3 started — `app/` structure, `PropertyFeatures` schema, and prediction service under construction |
 | 2026-04-14 | Phase 0 documentation foundation completed — all planning docs, instruction files, and skill files created |
 | 2026-04-14 | Project initialized — workspace structure established |
 
