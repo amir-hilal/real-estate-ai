@@ -24,12 +24,9 @@ logger = logging.getLogger(__name__)
 # Must stay in sync with what was used in model_training.ipynb Section 3.
 _RARE_EXTERIORS = {"BrkComm", "ImStucc", "CBlock", "AsphShn", "Stone"}
 
-# Column order must match training exactly.
-_FEATURE_COLUMNS = [
-    "GrLivArea", "OverallQual", "YearBuilt", "Neighborhood",
-    "TotalBsmtSF", "GarageCars", "FullBath", "YearRemodAdd",
-    "Fireplaces", "LotArea", "MasVnrArea", "Exterior1st",
-]
+# Derived from the schema definition order, which must match training column order.
+# Do not hardcode this list — let the schema be the single source of truth.
+_FEATURE_COLUMNS = list(PropertyFeatures.model_fields.keys())
 
 
 def load_pipeline(model_path: Path):
