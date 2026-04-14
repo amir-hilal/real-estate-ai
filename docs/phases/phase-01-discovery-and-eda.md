@@ -79,15 +79,15 @@ Work through these in order. Do not skip ahead.
 - [x] Confirm or revise the shortlist based on computed importances — shortlist to be finalised in Section 9
 
 ### Outlier Analysis
-- [ ] Plot `GrLivArea` vs `SalePrice` — identify any extreme outliers (very large area, very low price)
-- [ ] Decide: remove outliers before training? Documented decision: ________________
-- [ ] Check for any clearly erroneous values in numeric columns (e.g., negative year built)
+- [x] Plot `GrLivArea` vs `SalePrice` — identified 2 properties with GrLivArea > 4,000 sq ft and SalePrice < $200k; both have `SaleCondition = "Partial"` (non-arms-length transactions)
+- [x] Decide: remove outliers before training? **Yes** — remove rows where `GrLivArea > 4000 AND SalePrice < $200k`; these are partial-interest sales that distort the price-to-size relationship for the target population (normal residential sales)
+- [x] Check for any clearly erroneous values in numeric columns — all year columns, `LotArea`, and `GrLivArea` passed bounds checks; no erroneous values found
 
 ### Categorical Feature Analysis
-- [ ] Count unique values per categorical feature
-- [ ] Identify high-cardinality features (>20 unique values) and decide: keep, bin, or encode
-- [ ] Plot `SalePrice` by `Neighborhood` to assess neighborhood price effect
-- [ ] Decide whether `Neighborhood` should be a required field in the `PropertyFeatures` schema
+- [x] Count unique values per categorical feature — 3 features exceed threshold (>10): `Neighborhood` (25), `Exterior1st` (~15), `Exterior2nd` (~15)
+- [x] Identify high-cardinality features and decide: `Neighborhood` → target encoding; `Exterior1st` → one-hot after binning rares; `Exterior2nd` → **dropped** (85% overlap with `Exterior1st`)
+- [x] Plot `SalePrice` by `Neighborhood` — strong price signal confirmed; ~$350k spread across neighborhoods (median range ~$75k–$320k)
+- [x] Decide whether `Neighborhood` should be a required field — **Yes, required** (price effect is too large to leave optional)
 
 ### Feature Selection for Schema
 - [ ] Select 10–20 features to include in the `PropertyFeatures` schema
@@ -140,7 +140,7 @@ Some Ames features are assessor-specific (e.g., `OverallQual` is a 1–10 subjec
 > These answers are required inputs for Phase 2. Do not start modeling without them.
 
 1. **Target transform:** Will `SalePrice` be log-transformed? **Yes** — `np.log1p()` applied before training; predictions converted back with `np.expm1()` before returning to the user. Raw skewness = 1.74; log1p skewness = 0.12. See `ml/eda.ipynb` Section 5.
-2. **Outlier policy:** Which (if any) rows will be removed? *(answer: ________)*
+2. **Outlier policy:** Which (if any) rows will be removed? **Remove rows where `GrLivArea > 4000 AND SalePrice < $200k`** — 2 rows in the training set. Both have `SaleCondition = "Partial"` (non-arms-length transactions, not market sales). Removal is applied to the training set only. See `ml/eda.ipynb` Section 7.
 3. **Final feature list:** Which 10–20 features are in the schema? *(answer: see notebook)*
 4. **Imputation strategy per feature:** Group A (NA = no feature) → encode as `"None"` category or `Has___` binary. Group B (true gaps): `LotFrontage` → median by Neighborhood; `GarageYrBlt` → fill with `YearBuilt`; `Electrical` (1 row) → mode. All statistics computed on training set only inside `sklearn.Pipeline`. See `ml/eda.ipynb` Section 4.
 5. **Required features:** Which schema features are mandatory for prediction to proceed? *(answer: ________)*
