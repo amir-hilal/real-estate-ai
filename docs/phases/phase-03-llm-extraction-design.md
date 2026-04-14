@@ -157,11 +157,11 @@ Before this phase is considered complete, the following test cases must be run a
 
 ## Key Questions to Resolve in This Phase
 
-- [ ] Which LLM is being used? Does it support JSON mode or function calling?
-- [ ] Will the prompt use few-shot examples, zero-shot, or structured output via tool call?
-- [ ] How many retry attempts will be made if JSON parsing fails?
-- [ ] If the LLM is changed in the future, how do we know the extractionquality hasn't regressed? (Answer: the test query plan above becomes a regression suite)
-- [ ] What is the token cost per extraction request? Is it within acceptable range?
+- [x] Which LLM is being used? Does it support JSON mode or function calling? **ANSWERED** — Ollama `phi4-mini` (dev) + Groq `llama-3.3-70b-versatile` (prod). Both support JSON mode via `response_format={"type": "json_object"}`. See ADR-007.
+- [x] Will the prompt use few-shot examples, zero-shot, or structured output via tool call? **ANSWERED** — Few-shot (2 examples in the prompt). Small models need examples for reliable JSON structure.
+- [x] How many retry attempts will be made if JSON parsing fails? **ANSWERED** — 1 retry with a stricter format instruction appended. If that also fails, return 422. Per `llm.instructions.md`.
+- [x] If the LLM is changed in the future, how do we know the extraction quality hasn't regressed? **ANSWERED** — The 10 test queries become a regression suite. Run them on both `phi4-mini` and `llama-3.3-70b`.
+- [x] What is the token cost per extraction request? Is it within acceptable range? **ANSWERED** — Free for dev (Ollama local). Groq free tier handles low volume. Not a blocker.
 
 ---
 

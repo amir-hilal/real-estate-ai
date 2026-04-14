@@ -13,3 +13,11 @@ class PredictionResponse(BaseModel):
     predicted_price: float
     features: dict[str, Any]
     explanation: Optional[str] = None
+
+
+class ExtractionResult(BaseModel):
+    """Structured result from the Stage 1 extraction service."""
+    is_property_description: bool
+    features: Optional[dict[str, Any]] = None
+    missing_required: list[str] = []
+    message: Optional[str] = None
