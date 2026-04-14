@@ -53,5 +53,19 @@
     "OverallQual",
     "YearBuilt",
     "Neighborhood"
+  ],
+  "top_features": [
+    "OverallQual",
+    "GrLivArea",
+    "Neighborhood",
+    "TotalBsmtSF",
+    "GarageCars",
+    "LotArea",
+    "YearRemodAdd",
+    "YearBuilt",
+    "Fireplaces",
+    "MasVnrArea",
+    "Exterior1st",
+    "FullBath"
   ]
 }
