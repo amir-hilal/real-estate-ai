@@ -38,7 +38,7 @@
 |----|-----------|-------|---------------|
 | A-11 | ~~GPT-4o (or an equivalent capable LLM with structured output support) is available and accessible via API key~~ **REVISED** — Using Ollama (`phi4-mini`) for development (local, free) and Groq (`llama-3.3-70b-versatile`) for production. Both expose OpenAI-compatible APIs; the `openai` Python SDK works with both. See ADR-007. | ADR-007, 2026-04-14 | If Groq's free tier has insufficient quota, switch to another OpenAI-compatible provider via env vars only |
 | A-12 | Structured JSON output mode (e.g., OpenAI response_format=json, function calling, or Pydantic AI) is reliable enough for Stage 1 extraction | Documented capability | May require retry logic or more rigid prompting if JSON errors occur |
-| A-13 | Stage 1 LLM can reliably extract the 10–15 most important Ames features from a user's plain-English description | Based on LLM instruction-following capability | Some features may require more explicit prompting; test cases will validate this |
+| A-13 | ~~Stage 1 LLM can reliably extract the 10–15 most important Ames features from a user's plain-English description~~ **CONFIRMED** — 11 integration tests (T01–T10) pass against Ollama `phi4-mini`. T01 extracted 11/12 fields correctly. JSON mode + few-shot examples + `Literal` enum validation = reliable extraction. See `tests/test_extraction_integration.py`. | Verified 2026-04-14 | N/A |
 | A-14 | Stage 2 LLM will not hallucinate statistics if the prompt explicitly provides the correct values in context | Grounding via in-context data reduces hallucination | Must be validated in Phase 4; spot-checking explanations against actual stats is required |
 | A-15 | Two separate LLM calls (extraction + explanation) will be more maintainable than a single combined prompt | Separation of concerns | If combined prompt is tested and reliably more accurate, consolidation can be considered post-MVP |
 
@@ -89,12 +89,12 @@ These are not assumptions — they are open questions that only the data can ans
 
 | ID | Risk | Likelihood | Impact | Mitigation |
 |----|------|-----------|--------|------------|
-| R-01 | LLM JSON extraction is unreliable for complex schemas | Medium | High | Simplify schema to 10–15 fields; test with 10+ real property descriptions before finalizing |
-| R-02 | Data leakage is introduced silently during preprocessing | Medium | High | Enforce the leakage-prevention checklist before any evaluation metrics are reported |
-| R-03 | Model performs poorly due to insufficient feature engineering | Medium | Medium | Start with a documented baseline; iterate on features only if the baseline is substantially below target |
+| R-01 | ~~LLM JSON extraction is unreliable for complex schemas~~ **MITIGATED** — 12-field schema tested with 10+ queries (T01–T10); all pass. JSON mode + few-shot examples + retry logic handles edge cases. `Literal` enum types catch invalid values at validation. | Low | High | ✅ Schema simplified to 12 fields; tested with 11 integration tests |
+| R-02 | ~~Data leakage is introduced silently during preprocessing~~ **MITIGATED** — Phase 2 leakage checklist fully passed. All preprocessing statistics computed inside `sklearn.Pipeline` on training data only. Outlier removal applied to training set before fitting. | Low | High | ✅ Leakage checklist enforced; all encoders/imputers inside Pipeline |
+| R-03 | ~~Model performs poorly due to insufficient feature engineering~~ **MITIGATED** — LightGBM test MAE = $17,936 (69.9% improvement over $59,568 baseline), R² = 0.8885. Both targets exceeded without interaction features. | Low | Medium | ✅ Baseline documented; targets exceeded |
 | R-04 | Stage 2 LLM generates confident but incorrect statistics | Medium | High | Always inject real statistics from training data into the prompt; never let LLM generate numbers |
-| R-05 | LLM API cost becomes significant during development | Low | Low | Use GPT-3.5 or local models during iteration; switch to GPT-4o only for final testing |
-| R-06 | Pydantic schema becomes out of sync with actual ML model features | Medium | High | Schema and model feature list are co-maintained; any change to one requires updating the other |
+| R-05 | ~~LLM API cost becomes significant during development~~ **MITIGATED** — Dev uses Ollama (local, free). Prod uses Groq free tier. No cost observed. | Low | Low | ✅ Ollama for dev; Groq free tier for prod |
+| R-06 | Pydantic schema becomes out of sync with actual ML model features | Medium | High | Schema has `Literal` enum types; `_FEATURE_COLUMNS` in prediction service matches. Still a manual sync point — any schema change requires model retraining. Integration tests catch mismatches. |
 
 ### External Dependencies
 
@@ -102,7 +102,7 @@ These are not assumptions — they are open questions that only the data can ans
 |------------|------------|------|---------|
 | OpenAI / Anthropic API access | Phase 3, Phase 4 | API key invalid or quota exceeded | **Revised** — Using Ollama (dev, no key) + Groq (prod). If Groq is unavailable, switch to another OpenAI-compatible provider via env vars. |
 | Ames Housing dataset availability | Phase 1 | Dataset pulled from Kaggle/OpenML | Mirror locally; do not depend on live URL |
-| scikit-learn, LightGBM, Pydantic | Phase 2, 3 | Version incompatibilities via pip | Pin all versions in requirements.txt from the start |
+| scikit-learn, LightGBM, Pydantic | Phase 2, 3 | Version incompatibilities via pip | All versions pinned in `requirements.txt` |
 
 ---
 
