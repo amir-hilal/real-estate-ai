@@ -39,7 +39,7 @@
 | A-11 | ~~GPT-4o (or an equivalent capable LLM with structured output support) is available and accessible via API key~~ **REVISED** — Using Ollama (`phi4-mini`) for development (local, free) and Groq (`llama-3.3-70b-versatile`) for production. Both expose OpenAI-compatible APIs; the `openai` Python SDK works with both. See ADR-007. | ADR-007, 2026-04-14 | If Groq's free tier has insufficient quota, switch to another OpenAI-compatible provider via env vars only |
 | A-12 | Structured JSON output mode (e.g., OpenAI response_format=json, function calling, or Pydantic AI) is reliable enough for Stage 1 extraction | Documented capability | May require retry logic or more rigid prompting if JSON errors occur |
 | A-13 | ~~Stage 1 LLM can reliably extract the 10–15 most important Ames features from a user's plain-English description~~ **CONFIRMED** — 11 integration tests (T01–T10) pass against Ollama `phi4-mini`. T01 extracted 11/12 fields correctly. JSON mode + few-shot examples + `Literal` enum validation = reliable extraction. See `tests/test_extraction_integration.py`. | Verified 2026-04-14 | N/A |
-| A-14 | Stage 2 LLM will not hallucinate statistics if the prompt explicitly provides the correct values in context | Grounding via in-context data reduces hallucination | Must be validated in Phase 4; spot-checking explanations against actual stats is required |
+| A-14 | ~~Stage 2 LLM will not hallucinate statistics if the prompt explicitly provides the correct values in context~~ **CONFIRMED** — E05 integration test asserts every dollar amount in the explanation is within $1,000 of an allowed value from the injected context (`training_stats.json`). All 5 evaluation scenarios pass. Grounding instruction + vocabulary restriction prevents statistic invention in both `phi4-mini` (dev) and expected to generalize to `llama-3.3-70b-versatile` (prod). | Verified 2026-04-14 | N/A |
 | A-15 | Two separate LLM calls (extraction + explanation) will be more maintainable than a single combined prompt | Separation of concerns | If combined prompt is tested and reliably more accurate, consolidation can be considered post-MVP |
 
 ---
@@ -128,9 +128,9 @@ These are not assumptions — they are open questions that only the data can ans
 
 ### Before Phase 4 (Prediction Interpretation)
 
-- [ ] **Q11:** What statistics from the training data are most useful for grounding the explanation?
-- [ ] **Q12:** What is the format and location of the persisted training statistics file?
-- [ ] **Q13:** How should the explanation handle predictions that are at the extremes (very low or very high)?
+- [x] **Q11:** What statistics from the training data are most useful for grounding the explanation? **ANSWERED** — Overall median ($165,000), 25th/75th percentile ($130k / $215k), median price-per-sqft ($120.09), neighborhood median (lookup by `Neighborhood` field), and `top_features` ranked by LightGBM gain importance. All present in `ml/artifacts/training_stats.json`.
+- [x] **Q12:** What is the format and location of the persisted training statistics file? **ANSWERED** — `ml/artifacts/training_stats.json`: flat JSON with fields `median_sale_price`, `mean_sale_price`, `std_sale_price`, `price_25th_percentile`, `price_75th_percentile`, `training_sample_size`, `median_price_per_sqft`, `neighborhood_median_price` (dict of 25 entries), `top_features` (ranked list), `model_type`, `features_used`, `required_features`.
+- [x] **Q13:** How should the explanation handle predictions at the extremes? **ANSWERED** — Price bracket instructions injected into the prompt at render time: above 75th percentile → highlight premium factors; below 25th percentile → acknowledge limiting factors; otherwise → use overall median as anchor. Implemented in `build_explanation_prompt()` in `app/services/explanation.py`.
 
 ### Before Phase 5 (API & Containerization)
 

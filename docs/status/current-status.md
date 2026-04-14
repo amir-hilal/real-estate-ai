@@ -7,7 +7,7 @@
 
 ## Current Phase
 
-**Phase 4 — Prediction Interpretation (Stage 3 LLM Explanation)**  
+**Phase 5 — API & Containerization**  
 Status: **Not Started**
 
 ---
@@ -41,13 +41,18 @@ Status: **Not Started**
   - [x] `tests/test_extraction_integration.py` — 11 integration tests (T01–T10 against Ollama, all passing)
   - [x] `pyproject.toml` — pytest config with `asyncio_mode = "auto"`
   - [x] ADR-007 (Ollama + Groq providers) added
+- [x] **Phase 4 complete** — All explanation components built, tested, and passing:
+  - [x] `prompts/explanation_v1.md` — Stage 3 prompt with grounding, anti-hallucination rules, vocabulary restriction, price-bracket instructions
+  - [x] `app/services/explanation.py` — `generate_explanation()`, `build_explanation_prompt()`, `_format_property_lines()`; `ExplanationError` fallback
+  - [x] `ml/artifacts/training_stats.json` — extended with `top_features` (LightGBM gain importance ranking)
+  - [x] `tests/test_explanation.py` — 20 unit tests (mocked LLM, <1s)
+  - [x] `tests/test_explanation_integration.py` — 5 evaluation scenarios E01–E05 against Ollama, all passing
+  - [x] Total test suite: 62 tests passing (46 unit + 16 integration)
 
 ---
 
 ## What Is Not Started
 
-- [ ] Stage 3 LLM explanation prompt (`prompts/explanation_v1.md`)
-- [ ] Explanation service (`app/services/explanation.py`)
 - [ ] API routes (`app/routes/`) — wiring extraction + prediction + explanation into endpoints
 - [ ] Docker setup (`Dockerfile`, `docker-compose.yml`)
 - [ ] UI (Phase 6)
@@ -64,12 +69,13 @@ Status: **Not Started**
 
 ## Next Actions (in order)
 
-1. **Review Phase 4 document** — `docs/phases/phase-04-prediction-interpretation.md`
-2. **Create `prompts/explanation_v1.md`** — Stage 3 LLM explanation prompt (grounded with `training_stats.json`)
-3. **Create `app/services/explanation.py`** — Stage 3 service
-4. **Wire API routes** — `/predict` (full pipeline), `/extract` (Stage 1 only)
-5. **Write tests for explanation service**
-6. **Docker setup** — `Dockerfile`, `docker-compose.yml`
+1. **Review Phase 5 document** — `docs/phases/phase-05-api-and-containerization.md`
+2. **Answer D-06** — Confirm endpoint structure: one combined `POST /predict` vs separate stage endpoints (leaning toward combined)
+3. **Create `app/routes/`** — implement `POST /predict` (full pipeline) and `POST /extract` (Stage 1 only); thin handlers delegating to services
+4. **Wire `app/main.py`** — register routes, inject model and stats at startup via lifespan
+5. **Write route tests** — unit tests with mocked services; integration test with full pipeline
+6. **Docker setup** — `Dockerfile`, `docker-compose.yml`, `.env.example` review
+7. **`make api`** — verify server starts and `/health` returns 200
 
 ---
 
@@ -90,6 +96,7 @@ Status: **Not Started**
 
 | Date | Activity |
 |------|----------|
+| 2026-04-14 | Phase 4 complete — explanation prompt, explanation service, 20 unit + 5 integration tests (E01–E05), all passing; `training_stats.json` extended with `top_features`; E05 grounding check validates no hallucinated statistics |
 | 2026-04-14 | Phase 3 complete — extraction prompt, LLM client, extraction service, 37 tests (26 unit + 11 integration), all passing; `PropertyFeatures` schema hardened with `Literal` enum types; bug caught and fixed by tests |
 | 2026-04-14 | Phase 2 complete — LightGBM model trained, serialized, evaluated; `training_stats.json` saved; all leakage checks passed |
 | 2026-04-14 | Phase 3 started — `app/` structure, `PropertyFeatures` schema, prediction service, LLM provider decision (ADR-007) |

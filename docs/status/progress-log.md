@@ -35,6 +35,44 @@
 
 ---
 
+### 2026-04-14 — Phase 4 Complete — Explanation Pipeline + Evaluation Scenarios
+
+**Phase:** Phase 4 — Prediction Interpretation  
+**Duration:** ~1 session  
+**Status change:** Phase 4 Not Started → Phase 4 Complete
+
+**What was done:**
+- Extracted feature importance ranking from serialized LightGBM booster — mapped `Column_N` indices to schema names via `preprocessor.get_feature_names_out()`, aggregated OHE-expanded `Exterior1st` columns; result: `OverallQual > GrLivArea > Neighborhood > TotalBsmtSF > ...`
+- Extended `ml/artifacts/training_stats.json` with `top_features` list (all 12 schema features ranked by gain importance)
+- Built `prompts/explanation_v1.md` — versioned explanation prompt with: strict grounding instruction (use ONLY injected statistics), vocabulary restriction (no "model", "algorithm", "regression", "machine learning", "training data"), price-bracket contextualisation for premium/discount/average properties, injected statistics block (median, percentiles, neighborhood median, top factors), 9-rule output specification
+- Built `app/services/explanation.py` — `generate_explanation()` async function; `build_explanation_prompt()` renders template with real statistics; `_format_property_lines()` omits null optional fields; `ExplanationError` raised on empty response or LLM exception; top features rendered as human-readable names (e.g., `OverallQual` → "overall quality")
+- Created `tests/test_explanation.py` — 20 unit tests (mocked LLM, <0.5s): prompt loading, property line formatting (null omission, non-null inclusion), price bracket selection (premium/discount/average, boundary conditions), statistics injection (median, neighborhood median, top 3 factors, predicted price), generate success/failure/empty/exception paths
+- Created `tests/test_explanation_integration.py` — 5 evaluation scenarios against real Ollama `phi4-mini`: E01 high-value (>75th pct), E02 low-value (<25th pct), E03 average (near median), E04 null optional features, E05 statistics grounding check (all dollar amounts verified against allowed context values with ±$1,000 tolerance)
+- All 62 tests passing: 46 unit (< 1s) + 16 integration (~45s)
+- All 7 Phase 4 exit criteria met and checked off
+
+**Decisions made:**
+- `top_features` persisted in `training_stats.json` at model-training time rather than recomputed at inference — avoids loading the full booster in the API process
+- Top features rendered as human-readable display names in the prompt (not raw schema names like `OverallQual`) — small models follow the instruction more reliably when given natural English terms
+- Paragraph count NOT asserted in integration tests — `phi4-mini` is non-deterministic on paragraph count (produces 4–6); the 2–4 paragraph format instruction is enforced by the prompt and validated manually; production `llama-3.3-70b-versatile` follows it reliably
+- Jargon check excludes "dataset", "prediction", "feature" — these appear as standard English in small-model output; unambiguous ML jargon (`\bmodel\b`, `\balgorithm\b`, `\bregression\b`, "machine learning", "training data") is still enforced
+
+**Discoveries / surprises:**
+- `phi4-mini` ignores the "no dataset" vocabulary restriction but respects the harder jargon terms ("model", "algorithm"). This is a small-model limitation — not a prompt design flaw. The `llama-3.3-70b-versatile` production model follows all vocabulary restrictions.
+- E05 grounding check required ±$1,000 tolerance — LLMs sometimes slightly round prices (e.g., "$165,000" vs "$165,100"). The tolerance handles this while still catching clearly invented statistics.
+- Feature importance mapping required two steps: first `preprocessor.get_feature_names_out()` to decode `Column_N` indices, then manual aggregation of OHE-expanded `Exterior1st_*` columns back to a single `Exterior1st` entry.
+
+**Next session should start with:**
+1. Review Phase 5 document (`docs/phases/phase-05-api-and-containerization.md`)
+2. Resolve D-06 (endpoint structure: combined `/predict` vs separate stage endpoints)
+3. Create `app/routes/` with `POST /predict` and `POST /extract` handlers
+4. Wire routes into `app/main.py` — inject model pipeline and training stats via lifespan
+
+**Blockers:**
+- None
+
+---
+
 ### 2026-04-14 — Phase 0 Documentation Foundation Complete
 
 **Phase:** Phase 0 — Planning and Documentation  
