@@ -106,3 +106,42 @@
 ---
 
 *The progress log is your engineering journal. Entries written the same day they happen are dramatically more useful than entries reconstructed from memory a week later.*
+
+---
+
+### 2026-04-14 — Phase 2 Complete + App Structure Started
+
+**Phase:** Phase 2 → Phase 3  
+**Duration:** ~1 session  
+**Status change:** Phase 2 In Progress → Phase 3 In Progress
+
+**What was done:**
+- Built `ml/model_training.ipynb` end-to-end (7 sections)
+- Outlier removal: 2 rows from train only (`GrLivArea > 4000 AND SalePrice < $200k`)
+- Preprocessing pipeline: `TargetEncoder` for Neighborhood, `OneHotEncoder` for Exterior1st (5 rare values → "Other"), `SimpleImputer(median)` for numeric
+- DummyRegressor baseline: MAE = $59,568, RMSE = $88,667, R² = -0.025
+- LightGBM (default params): Test MAE = $17,936 (69.9% improvement), RMSE = $29,238, R² = 0.8885
+- All evaluation plots generated (predicted vs actual, residuals, feature importance)
+- `ml/artifacts/model.joblib` serialized and round-trip verified (`Match: True`, 1438 KB)
+- `ml/artifacts/training_stats.json` saved (training-set only stats)
+- Leakage checklist fully cleared; all phase-02 exit criteria met
+- App structure creation begun: `app/schemas/`, `app/services/`, `app/config.py`, `app/main.py`
+
+**Decisions made:**
+- LightGBM selected as final model (ADR-006 to be added)
+- Train/test MAE gap (72%) noted but accepted — test metrics exceed both phase targets
+- Feature-name warning from LightGBM/sklearn TargetEncoder interplay: cosmetic only, no action needed
+
+**Discoveries / surprises:**
+- `OverallQual` dominates feature importance by a wide margin (gain ~875 vs next best ~250) — consistent with EDA Pearson r = 0.79
+- Exterior1st one-hot columns all near-zero importance — confirms it is a marginal feature
+- Residuals show slight heteroscedasticity at high predicted prices (>$400K) — expected given sparse data at that range, no action needed for MVP
+
+**Next session should start with:**
+1. Add ADR-006 (LightGBM selection rationale)
+2. Complete `app/schemas/property_features.py`
+3. Complete `app/services/prediction.py`
+4. Start Stage 1 extraction prompt (`prompts/stage1_extraction_v1.md`)
+
+**Blockers:**
+- B-02: LLM API key still needed for Phase 3 extraction/explanation stages

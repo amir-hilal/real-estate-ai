@@ -15,9 +15,9 @@
 | A-01 | ~~The Ames Housing dataset is available in full from a public source (Kaggle, OpenML, or equivalent)~~ **CONFIRMED** — Downloaded from OpenML ID 42165, saved locally at `ml/data/ames.csv`. No live URL dependency. | Verified 2026-04-14 | N/A |
 | A-02 | ~~The target variable is `SalePrice` (continuous, USD)~~ **CONFIRMED** — `SalePrice` present, range $34,900–$755,000, median $163,000. | Verified 2026-04-14 | N/A |
 | A-03 | ~~The dataset contains approximately 2,900 rows and 79+ features~~ **CORRECTED** — Actual shape is 1,460 rows × 81 columns (79 features + `Id` + `SalePrice`). The 2,900-row figure refers to the combined train+test split used in some Kaggle versions; we have the training portion only. | Verified 2026-04-14 | Feature plan unchanged — 1,460 rows is sufficient for the MVP model. |
-| A-04 | There are meaningful categorical features (neighborhood, building class, etc.) that require encoding — not just numeric features | Dataset documentation | Encoding strategy must be revisited |
+| A-04 | ~~There are meaningful categorical features (neighborhood, building class, etc.) that require encoding — not just numeric features~~ **CONFIRMED** — `Neighborhood` (25 values) → target encoding fit on training set only; `Exterior1st` (~15 values) → one-hot after binning rare values (<10 rows) to `"Other"`; `Exterior2nd` → dropped (85% overlap with `Exterior1st`). All encoders fit inside `sklearn.Pipeline` on training data only. | Verified 2026-04-14 | N/A |
 | A-05 | ~~Missing values exist in the dataset and are meaningful (e.g., "NA" for no garage, not a data error)~~ **CONFIRMED** — Two distinct groups identified: (1) ~19 columns where NA = feature doesn't exist on the property (PoolQC, Alley, FireplaceQu, Garage cols, Bsmt cols, etc.) — these are encoded as `"None"` or binary `Has___` columns, not imputed; (2) true data gaps (LotFrontage, GarageYrBlt, Electrical) — imputed with median/mode from training set only. | Verified 2026-04-14 | N/A |
-| A-06 | There are no obvious target-leaking features in the raw dataset that cannot be identified through careful EDA | General knowledge | Could invalidate model metrics if leakage is later discovered |
+| A-06 | ~~There are no obvious target-leaking features in the raw dataset that cannot be identified through careful EDA~~ **CONFIRMED** — EDA identified and removed the only problematic rows (2 partial-interest sales with anomalous price-to-size ratios). All preprocessing statistics are computed on training data only inside `sklearn.Pipeline`. Phase 2 leakage checklist passed. | Verified 2026-04-14 | N/A |
 
 ---
 
@@ -25,10 +25,10 @@
 
 | ID | Assumption | Basis | Risk if Wrong |
 |----|-----------|-------|---------------|
-| A-07 | A gradient-boosted tree model (XGBoost or LightGBM) will outperform linear regression after proper featurization | Common result on Ames dataset in public benchmarks | Simpler model may suffice; over-engineering gradient boosting for marginal gain |
-| A-08 | Feature engineering beyond clean encoding and imputation will not be required for an acceptable baseline | Ames is relatively well-behaved | May need to create interaction features or apply log transforms for acceptable performance |
-| A-09 | `SalePrice` should be log-transformed to normalization the target distribution | Common in Ames benchmarks | Must be confirmed by EDA — if distribution is already well-behaved, log transform complicates interpretation |
-| A-10 | scikit-learn Pipeline is sufficient for the preprocessing + model serialization combination | Standard ML practice | If model requires non-sklearn primitives, serialization approach must change |
+| A-07 | ~~A gradient-boosted tree model (XGBoost or LightGBM) will outperform linear regression after proper featurization~~ **CONFIRMED** — LightGBM achieved test MAE = $17,936 (69.9% improvement over $59,568 baseline), test R² = 0.8885. Both targets exceeded. | Verified 2026-04-14 | N/A |
+| A-08 | ~~Feature engineering beyond clean encoding and imputation will not be required for an acceptable baseline~~ **CONFIRMED** — Model met phase targets (MAE < $30,000, R² > 0.85) using only median imputation, target encoding for `Neighborhood`, one-hot encoding for `Exterior1st`, and log-transform on target. No interaction features needed. | Verified 2026-04-14 | N/A |
+| A-09 | ~~`SalePrice` should be log-transformed to normalize the target distribution~~ **CONFIRMED** — Raw skewness = 1.74; log1p skewness = 0.12. Q-Q plot confirms log1p correction. `np.log1p()` applied before training; `np.expm1()` applied at inference. | Verified 2026-04-14 | N/A |
+| A-10 | ~~scikit-learn Pipeline is sufficient for the preprocessing + model serialization combination~~ **CONFIRMED** — Full `sklearn.Pipeline` (preprocessor + LGBMRegressor) serialized to `ml/artifacts/model.joblib` via `joblib.dump()`. Round-trip verification passed (prediction match). | Verified 2026-04-14 | N/A |
 
 ---
 
@@ -120,7 +120,7 @@ These are not assumptions — they are open questions that only the data can ans
 
 ### Before Phase 3 (LLM Extraction Design)
 
-- [ ] **Q6:** What is the final set of features in the `PropertyFeatures` schema? (Locked after Phase 2)
+- [x] **Q6:** What is the final set of features in the `PropertyFeatures` schema? **ANSWERED — LOCKED** — 12 features: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood` (required); `TotalBsmtSF`, `GarageCars`, `FullBath`, `YearRemodAdd`, `Fireplaces`, `LotArea`, `MasVnrArea`, `Exterior1st` (optional). Schema implemented in `app/schemas/property_features.py`. Model trained on this exact feature set.
 - [x] **Q7:** Which features are "required" (prediction cannot proceed without them) vs "optional"? **ANSWERED** — Required: `GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood` (no sensible default exists for these). Optional: remaining 8 features — each has a documented default value. UI shows accuracy hint for missing optionals; context-aware hint for `YearRemodAdd` when `YearBuilt < 1990`.
 - [ ] **Q8:** What is the exact JSON structure the Stage 1 prompt must return?
 - [ ] **Q9:** How do we handle a property description that contains no extractable structured data?
