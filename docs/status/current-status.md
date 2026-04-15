@@ -8,7 +8,7 @@
 ## Current Phase
 
 **Phase 6 — UI**  
-Status: **Not started**
+Status: **In Progress**
 
 ---
 
@@ -64,9 +64,20 @@ Status: **Not started**
 
 - [x] **Phase 5 complete** — all 7 exit criteria satisfied
 
+- [x] **Phase 6 in progress** — React CDN UI built and running in Docker:
+  - [x] `app/static/index.html` — React 18 + Babel CDN + Tailwind Play CDN; single self-contained file, no npm/build step
+  - [x] `app/routes/ui.py` — `GET /` returns the HTML file as HTMLResponse; no new Python dependencies
+  - [x] `app/main.py` — UI router registered
+  - [x] Conversational UI feel — natural-language copy, 3-stage loading ("Thinking...", "Studying the market...", "Interpreting results...")
+  - [x] Happy path verified in browser: describe → stage loader → prediction card + explanation + collapsible details
+  - [x] UI verified inside Docker container at http://localhost:8000
+  - [ ] Missing fields form not yet explicitly tested with a partial description
+  - [ ] Error states not yet all explicitly triggered in browser
+
 ## What Is Not Started
 
-- [ ] UI (Phase 6)
+- [ ] Missing fields + error state UI testing (Phase 6 remaining)
+- [ ] Phase 6b — streaming explanation via SSE
 
 ---
 
@@ -78,7 +89,10 @@ Status: **Not started**
 
 ## Next Actions (in order)
 
-1. **Begin Phase 6** — UI design and implementation
+1. **Test missing fields flow** — submit a partial description (omit neighborhood and GrLivArea) to trigger Step 2a, verify form renders and second submission completes
+2. **Test all error states** — empty submit, non-property description, and simulate 500 to check error cards
+3. **Complete Phase 6 exit criteria** — check off items 2 and 4 once tested
+4. **Phase 6b** — implement `/predict/stream` SSE endpoint + streaming UI component
 
 ---
 
@@ -99,6 +113,8 @@ Status: **Not started**
 
 | Date | Activity |
 |------|----------|
+| 2026-04-15 | Phase 6 in progress — React CDN UI built (`app/static/index.html`); `GET /` route added; conversational UI with 3-stage loading (Thinking / Studying market / Interpreting); happy path verified in browser and in Docker container |
+| 2026-04-15 | Phase 5 complete — Docker image built (`real-estate-ai-api`); `docker compose up -d` started container; `GET /health` confirmed model loaded; `POST /predict` returned full pipeline result (`prediction_usd: 256855` + LLM explanation); all 7 exit criteria checked off; `OLLAMA_BASE_URL` override added to `docker-compose.yml` for host.docker.internal routing |
 | 2026-04-16 | Phase 5 substantially complete — 6 HTTP integration tests passing (A1–A6 in `tests/test_api_integration.py`); structured logging added to routes; phase-05 exit criteria 1–3 and 5–6 checked; Docker verification deferred (WSL2 Docker Desktop not enabled) |
 | 2026-04-15 | A-12 confirmed (JSON mode reliable); A-15 revised (three-step architecture is a fundamental constraint, not a maintainability preference); R-04 MITIGATED; R-06 MITIGATED |
 | 2026-04-14 | Phase 4 complete — explanation prompt, explanation service, 20 unit + 5 integration tests (E01–E05), all passing; `training_stats.json` extended with `top_features`; E05 grounding check validates no hallucinated statistics |

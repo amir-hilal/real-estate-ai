@@ -1,7 +1,7 @@
 # Phase 6: UI Flow
 
-> **Status:** Not Started  
-> **Depends on:** Phase 5 (API running and tested)  
+> **Status:** In Progress
+> **Depends on:** Phase 5 complete ✓ (API running in Docker, all 7 exit criteria met)
 > **Blocks:** Phase 7 (demo requires a working interface)
 
 ---
@@ -128,13 +128,18 @@ The extracted features section should be human-friendly, not raw schema field na
 
 | Schema field | Display label |
 |-------------|--------------|
-| `bedroom_abv_gr` | Bedrooms (above grade) |
-| `year_built` | Year Built |
-| `gr_liv_area` | Above-Grade Living Area (sq ft) |
-| `garage_cars` | Garage Capacity (cars) |
-| `neighborhood` | Neighborhood |
-| `bsmt_qual` | Basement Quality |
-| `overall_qual` | Overall Quality (1–10) |
+| `GrLivArea` | Above-Grade Living Area (sq ft) |
+| `OverallQual` | Overall Quality (1–10) |
+| `YearBuilt` | Year Built |
+| `Neighborhood` | Neighborhood |
+| `TotalBsmtSF` | Total Basement Area (sq ft) |
+| `GarageCars` | Garage Capacity (cars) |
+| `FullBath` | Full Bathrooms (above grade) |
+| `YearRemodAdd` | Year Last Remodelled |
+| `Fireplaces` | Number of Fireplaces |
+| `LotArea` | Lot Area (sq ft) |
+| `MasVnrArea` | Masonry Veneer Area (sq ft) |
+| `Exterior1st` | Primary Exterior Material |
 
 A field-to-label mapping must be defined once and reused across all UI components.
 
@@ -155,10 +160,12 @@ A field-to-label mapping must be defined once and reused across all UI component
 
 ## Technical Notes
 
-- The MVP UI does not require a complex frontend framework. A minimal approach with plain HTML/CSS and JavaScript, or a simple Python-rendered template (Jinja2 via FastAPI) is sufficient.
-- If a framework is used (React, Vue, etc.), it must be chosen based on the developer's existing knowledge — not because it is popular. Learning a frontend framework should not compete with learning the ML/LLM pipeline.
-- The UI communicates with the FastAPI backend only through documented API endpoints. No direct model or LLM calls from the frontend.
-- The UI is served by the same Docker container as the API in MVP (no separate frontend container).
+- **Implementation approach chosen:** React 18 + Babel Standalone + Tailwind Play CDN, served as a single self-contained `app/static/index.html` file via FastAPI `GET /`. No npm, no build step, no new Python dependencies required.
+- The UI uses a conversation-like presentation: natural-language copy, staged loading feedback ("Thinking...", "Studying the market...", "Interpreting results..."), and a step-by-step interaction flow.
+- Missing field collection is handled with a structured form but with conversational copy ("Got it! Just a few more details.") that makes the interaction feel guided rather than mechanical.
+- The UI communicates with the FastAPI backend only through the documented `/predict` endpoint. No direct model or LLM calls from the frontend.
+- The UI is served by the same Docker container as the API (no separate frontend container).
+- The Babel and Tailwind CDN warnings about production use are expected and acceptable for MVP.
 
 ---
 
@@ -166,14 +173,38 @@ A field-to-label mapping must be defined once and reused across all UI component
 
 Phase 6 is complete only when ALL of the following are true:
 
-1. [ ] Input form renders and submits a description to the API
+1. [x] Input form renders and submits a description to the API — verified
 2. [ ] Missing fields form renders correctly for at least one real missing-field scenario
-3. [ ] Results page displays prediction and explanation correctly
+3. [x] Results page displays prediction and explanation correctly — verified
 4. [ ] All error states from the table above have been tested and render correctly
-5. [ ] Extracted features section is displayed (even if collapsed)
-6. [ ] Full end-to-end flow works from browser without touching the terminal
-7. [ ] UI runs inside the Docker container
+5. [x] Extracted features section is displayed (even if collapsed) — verified
+6. [x] Full end-to-end flow works from browser without touching the terminal — verified
+7. [x] UI runs inside the Docker container — verified at http://localhost:8000
 
 ---
 
-*The UI exists to demonstrate the pipeline. Its quality is secondary to the correctness of the underlying system.*
+## Phase 6b — Streaming (Post Phase 6)
+
+> **Status:** Not Started — depends on Phase 6 complete
+
+**Goal:** Stream the LLM explanation token-by-token to the browser, rendering it in real time rather than waiting for the full response. This eliminates the 10–20 second wait for Stage 3 and gives the UI a live, ChatGPT-like feel.
+
+**What changes:**
+
+| Component | Current (Phase 6) | Phase 6b |
+|-----------|-------------------|----------|
+| `/predict` endpoint | Returns complete JSON when done | Returns prediction immediately; explanation streamed via SSE or chunked transfer |
+| UI | Shows "Interpreting results..." until response complete | Renders explanation words as they arrive |
+| API contract | Single JSON response | Split: prediction JSON first, then SSE stream for explanation text |
+
+**Implementation approach:**
+- Add `POST /predict/stream` endpoint that uses FastAPI `StreamingResponse` with `text/event-stream` content type
+- Run Stages 1 + 2 synchronously; on completion emit a prediction event with `prediction_usd` and `features`
+- Run Stage 3 (LLM explanation) with `stream=True` on the OpenAI SDK; forward each chunk as an SSE event
+- UI: use the browser `EventSource` API to consume the stream; update the explanation text incrementally
+
+**Acceptance criteria:**
+- [ ] `POST /predict/stream` returns the prediction price within 1s of extraction completing
+- [ ] Explanation text begins rendering in the browser within 500ms of the prediction being returned
+- [ ] Existing `POST /predict` endpoint continues working unchanged (non-streaming consumers unaffected)
+- [ ] Streaming works inside Docker container

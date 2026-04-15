@@ -41,7 +41,9 @@ app = FastAPI(
 
 from app.routes.extract import router as extract_router
 from app.routes.predict import router as predict_router
+from app.routes.ui import router as ui_router
 
+app.include_router(ui_router)
 app.include_router(extract_router)
 app.include_router(predict_router)
 
