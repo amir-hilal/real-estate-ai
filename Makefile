@@ -1,4 +1,4 @@
-.PHONY: help install dev api ui test test-unit test-integration lint clean
+.PHONY: help install serve serve-prod test test-unit test-integration lint clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -26,10 +26,10 @@ $(VENV)/bin/activate:
 # Run services
 # ---------------------------------------------------------------------------
 
-api: ## Start the FastAPI server (dev mode with auto-reload)
+serve: ## Start the API + UI (dev mode with auto-reload) — open http://localhost:8000
 	$(UVICORN) app.main:app --host 0.0.0.0 --port 8000 --reload
 
-api-prod: ## Start the FastAPI server (production mode)
+serve-prod: ## Start the API + UI (production mode)
 	ENVIRONMENT=production $(UVICORN) app.main:app --host 0.0.0.0 --port 8000
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # Prompt versioning
     extraction_prompt_version: str = "v1"
     explanation_prompt_version: str = "v1"
+    chat_prompt_version: str = "v1"
 
     # ML model artifact
     model_path: Path = Path("ml/artifacts/model.joblib")
@@ -30,6 +31,9 @@ class Settings(BaseSettings):
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
+
+    # CORS — frontend origin(s) allowed to call the API
+    cors_origin: str = "http://localhost:5173"
 
     @property
     def llm_base_url(self) -> str:

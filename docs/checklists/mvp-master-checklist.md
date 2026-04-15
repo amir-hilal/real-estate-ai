@@ -128,14 +128,20 @@
 
 ## Phase 6 — UI Flow
 
-- [x] Input form renders in browser with text area and submit button — verified
-- [ ] Missing fields form renders correctly for at least one real missing-field scenario — not yet tested
-- [x] Prediction and explanation display correctly after full pipeline — verified in browser
-- [ ] All error states from Phase 6 doc are tested and render correctly — not yet explicitly triggered
-- [x] Extracted features panel is displayed (even if collapsed by default) — verified
-- [x] "Estimate Another Property" reset button works — verified
-- [x] UI runs inside Docker container and is accessible from the browser — verified at http://localhost:8000
-- [x] Full end-to-end flow tested from browser: describe → (fill gaps) → see prediction + explanation — verified
+- [x] `POST /chat` SSE endpoint created and returns events (reply, prediction, token, done, error) — verified with curl
+- [x] Chat orchestration service (`app/services/chat.py`) handles intent routing, feature merging, prediction, and streamed explanation
+- [x] Chat prompt (`prompts/chat_v1.md`) covers intent classification + feature extraction with anti-hallucination rules
+- [x] Backend SSE streaming verified: each explanation token arrives as a separate `event: token` line — confirmed with curl
+- [ ] CORS middleware added to FastAPI backend for cross-origin frontend requests
+- [ ] Standalone React app (Vite + React 18 + TypeScript + plain CSS) created and running
+- [ ] Greeting input ("Hello") receives a conversational reply, not an error — verified in React app
+- [ ] Vague property description triggers follow-up question for missing required fields — verified in React app
+- [ ] Conversation accumulates features across turns until all required fields are known — verified in React app
+- [ ] Prediction card renders inline in the chat thread when all required fields are present — verified in React app
+- [ ] Explanation streams token-by-token into the chat bubble (not popping in all at once) — verified in React app
+- [ ] Error bubbles appear in the thread for LLM failure and model-not-ready scenarios — verified in React app
+- [ ] Full end-to-end flow works from browser: greeting → property → missing fields → prediction + streamed explanation
+- [ ] `/predict` endpoint still passes all existing tests (no regression)
 - [ ] Phase 6 exit criteria all checked in `docs/phases/phase-06-ui-flow.md`
 
 ---

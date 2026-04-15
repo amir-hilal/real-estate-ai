@@ -134,7 +134,7 @@ Background processing will be revisited when:
 ## ADR-004 — Form-Based UI Before Chat-First UI
 
 **Date:** 2026-04-14  
-**Status:** Accepted  
+**Status:** Superseded by ADR-008  
 **Decided by:** Project lead
 
 #### Context
@@ -261,3 +261,70 @@ The pipeline requires two LLM calls per request: Stage 1 (feature extraction) an
 - Prompt quality may differ between `phi4-mini` (3.8B params) and `llama-3.3-70b` — prompts must be tested on both
 - The `openai` Python package is still a dependency (used as a universal client), but OpenAI's API is not called
 - If Groq's free tier is insufficient for production, switching to another OpenAI-compatible provider (Together AI, Fireworks, etc.) requires only changing env vars
+
+---
+
+## ADR-008 — Conversational Chat UI Supersedes Form-Based UI
+
+**Date:** 2026-04-15  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+ADR-004 chose a form-based UI on the grounds that the pipeline was not yet proven and that a chat interface would require significant additional engineering before the core system was validated. By Phase 6, those conditions have changed:
+
+1. **Pipeline proven.** Phases 1–5 are complete. Extraction, prediction, and explanation all work end-to-end in Docker.
+2. **Missing fields are common.** Testing confirmed that most natural-language descriptions leave at least one required field (`OverallQual` or `GrLivArea`) null. The form-based fallback is needed in almost every interaction — making it the primary UX, not a fallback.
+3. **A form cannot handle arbitrary input.** A user greeting ("Hello"), a question ("What makes a property more valuable?"), or an irrelevant message causes the form-based UI to return an error card. This is a poor experience that a chat model handles naturally.
+4. **Streaming is the right fix for perceived latency.** The 10-20 second LLM explanation wait cannot be fixed by spinners — it requires streaming. Streaming belongs in a conversational UI, not a single-page form.
+
+**Options considered:**
+1. **Keep form-based UI, add graceful error handling for non-property input** — patching symptoms; does not solve the missing-field conversation loop
+2. **Add a pre-check LLM call before the form** — doubles LLM calls; still doesn't produce a natural experience
+3. **Full conversational chat UI with `POST /chat` SSE endpoint** — handles all input types, streams explanation, accumulates features naturally across turns
+
+#### Decision
+Replace the form-based UI with a conversational chat interface. The `POST /chat` endpoint accepts any user message plus conversation history and accumulated features, routes intent via an LLM call, and streams the result. The existing `POST /predict` endpoint is unchanged.
+
+#### Consequences
+- The partial form-based UI (exit criteria 1, 3, 5, 6, 7 verified) is replaced entirely — no prior work carries forward to the new exit criteria
+- A new prompt file is required (`prompts/chat_v1.md`) covering combined intent classification + extraction
+- Frontend state management is more complex: `messages[]`, `accumulatedFeatures{}`, and streaming buffer all tracked in React state
+- The `/predict` endpoint and all its tests remain untouched — `/chat` is additive
+- Phase 6b (streaming explanation) is merged into Phase 6 — it is no longer a separate phase but an integral part of the chat endpoint
+
+---
+
+## ADR-009 — Standalone React Frontend Replaces Embedded HTML
+
+**Date:** 2026-04-15  
+**Status:** Accepted  
+**Decided by:** Project lead
+
+#### Context
+ADR-008 chose a conversational chat UI with token-by-token streaming of the explanation. The initial implementation embedded the frontend as a single `app/static/index.html` file using React 18 + Babel Standalone (in-browser JSX transpilation) + Tailwind Play CDN, served directly by the FastAPI backend via `GET /`.
+
+This approach failed to deliver token-by-token streaming despite multiple fix attempts:
+
+1. **`flushSync` did not work.** React 18's automatic batching groups all `setState` calls within a microtask. Even with `flushSync`, the browser did not paint between token updates because the JS call stack did not unwind between iterations of the SSE event processing loop.
+2. **`requestAnimationFrame` yields were added.** An `await yieldToBrowser()` (double-rAF) pattern was inserted between token events. This approach is architecturally correct, but Babel Standalone's in-browser transpilation changes how async generators interact with React's scheduler, preventing reliable frame-by-frame rendering.
+3. **Backend confirmed working.** A vanilla JS debug page (`debug-stream.html`) with direct DOM writes (`element.textContent = ...`) showed perfect token-by-token rendering. Every `event: token` SSE event arrived individually with correct timing. The problem is exclusively in the React CDN frontend layer.
+
+The root cause: Babel Standalone transpiles JSX at runtime in the browser, producing code that does not match the assumptions of React 18's concurrent features and batching behavior. A proper build step (Vite/webpack) produces optimized output where these patterns work as documented.
+
+**Options considered:**
+1. **Keep Babel Standalone, work around batching** — Multiple workarounds attempted (`flushSync`, `requestAnimationFrame` yields, `setTimeout(0)`). None produced reliable per-token rendering. The in-browser transpiler is fundamentally incompatible with the required rendering behavior.
+2. **Switch to vanilla JS (no React)** — The debug page proved this works. However, managing a chat thread with state (messages, accumulated features, streaming text, prediction cards) without a framework produces brittle, hard-to-maintain code.
+3. **Standalone React app with Vite build** — Proper build step produces standard React 18 output. Streaming patterns work as documented. TypeScript adds type safety. The app runs independently and communicates with the backend via `POST /chat`.
+
+#### Decision
+Extract the frontend to a standalone React application built with Vite + React 18 + TypeScript + plain CSS. The app lives in a separate directory outside the FastAPI project. The FastAPI backend becomes a pure API server — `app/routes/ui.py`, `app/static/`, and all HTML-serving code are removed. CORS middleware is added to the backend to allow cross-origin requests from the frontend dev server.
+
+#### Consequences
+- Token-by-token streaming will work reliably with a proper React 18 build
+- The frontend and backend are decoupled — they can be developed, tested, and deployed independently
+- CORS middleware must be added to the FastAPI backend (new `cors_origin` setting)
+- The Docker setup changes: either the frontend is built and served by a static file server (nginx), or the backend proxies it — this is a deployment decision for Phase 7
+- `GET /` no longer serves the UI from the FastAPI backend — the API root returns the health endpoint or OpenAPI docs
+- The frontend is a separate codebase with its own `package.json`, `tsconfig.json`, and `vite.config.ts`
+- No npm or Node.js dependencies are added to the Python backend project

@@ -64,20 +64,25 @@ Status: **In Progress**
 
 - [x] **Phase 5 complete** — all 7 exit criteria satisfied
 
-- [x] **Phase 6 in progress** — React CDN UI built and running in Docker:
-  - [x] `app/static/index.html` — React 18 + Babel CDN + Tailwind Play CDN; single self-contained file, no npm/build step
-  - [x] `app/routes/ui.py` — `GET /` returns the HTML file as HTMLResponse; no new Python dependencies
-  - [x] `app/main.py` — UI router registered
-  - [x] Conversational UI feel — natural-language copy, 3-stage loading ("Thinking...", "Studying the market...", "Interpreting results...")
-  - [x] Happy path verified in browser: describe → stage loader → prediction card + explanation + collapsible details
-  - [x] UI verified inside Docker container at http://localhost:8000
-  - [ ] Missing fields form not yet explicitly tested with a partial description
-  - [ ] Error states not yet all explicitly triggered in browser
+- [x] **Phase 6 in progress** — Chat backend complete, frontend pivoting to standalone React app:
+  - [x] `app/routes/chat.py` — `POST /chat` SSE endpoint, streams reply/prediction/token/done/error events
+  - [x] `app/services/chat.py` — Chat orchestration: intent routing, feature merging, prediction, streamed explanation
+  - [x] `app/schemas/chat.py` — `ChatMessage`, `ChatRequest` Pydantic models
+  - [x] `prompts/chat_v1.md` — Combined intent classification + feature extraction prompt
+  - [x] `app/clients/llm.py` — `chat_completion_stream()` added for token-by-token streaming
+  - [x] `app/config.py` — `chat_prompt_version` setting added
+  - [x] Backend SSE streaming verified with curl — each token arrives as a separate event
+  - [x] Vanilla JS debug page confirmed: backend streams perfectly, issue is React CDN layer
+  - [x] Embedded React CDN UI removed (Babel Standalone cannot deliver reliable per-token streaming)
+  - [ ] Standalone React app (Vite + React 18 + TypeScript + plain CSS) — not yet created
+  - [ ] CORS middleware not yet added to FastAPI backend
 
 ## What Is Not Started
 
-- [ ] Missing fields + error state UI testing (Phase 6 remaining)
-- [ ] Phase 6b — streaming explanation via SSE
+- [ ] Standalone React frontend app (Vite + React 18 + TS + Tailwind)
+- [ ] CORS middleware on FastAPI backend
+- [ ] Chat-specific unit tests (`tests/unit/test_chat_service.py`)
+- [ ] Chat integration tests (`tests/integration/test_chat_endpoint.py`)
 
 ---
 
@@ -89,10 +94,12 @@ Status: **In Progress**
 
 ## Next Actions (in order)
 
-1. **Test missing fields flow** — submit a partial description (omit neighborhood and GrLivArea) to trigger Step 2a, verify form renders and second submission completes
-2. **Test all error states** — empty submit, non-property description, and simulate 500 to check error cards
-3. **Complete Phase 6 exit criteria** — check off items 2 and 4 once tested
-4. **Phase 6b** — implement `/predict/stream` SSE endpoint + streaming UI component
+1. **Create standalone React app** — Vite + React 18 + TypeScript + Tailwind CSS in a separate directory
+2. **Add CORS middleware** to FastAPI backend (`cors_origin` config setting)
+3. **Implement chat UI** in the standalone app — chat thread, SSE parsing, token streaming, prediction card
+4. **Verify streaming** — explanation tokens render word-by-word in the React app
+5. **Write chat tests** — unit tests for `chat.py` service, integration tests for `/chat` endpoint
+6. **Complete Phase 6 exit criteria** — all 11 items
 
 ---
 

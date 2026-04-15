@@ -8,123 +8,188 @@
 
 ## Purpose
 
-Phase 6 adds a user interface to the system. The interface must enable a non-technical user to describe a property, fill in any missing fields, and receive a prediction with explanation — without needing to use curl or understand the API.
-
-The UI is an MVP-tier deliverable. It is not a polished product. It is sufficient to demonstrate the full pipeline end-to-end in a real-world interaction pattern.
+Phase 6 adds a user interface to the system. The interface enables a non-technical user to describe a property in natural language, have a back-and-forth conversation until all required fields are known, and receive a price prediction with a streamed explanation — without needing to use curl or understand the API.
 
 ---
 
-## Why Form-Based UI Before Chat-First UI (for MVP)
+## Revision History
 
-A conversational chat UI is tempting — it feels modern and aligns with how LLMs are popularly used. However, for MVP, a form-based UI is strongly preferred for the following reasons:
+### Rev 1: Form-Based UI → Chat UI (ADR-008)
 
-### Against a chat-first UI for MVP:
-1. **State management complexity:** A chat interface requires managing conversation history, turn tracking, and contextual memory. None of this is needed when all relevant information can be gathered in one or two form submissions.
-2. **Validation is harder to express:** In a form, missing required fields are shown as labeled controls. In a chat, the conversation needs to pivot to question the user — requiring prompt engineering for the collection flow, not just extraction.
-3. **Results are harder to display:** Showing a structured price prediction and explanation in a chat thread is visually awkward. A dedicated results layout is cleaner.
-4. **Development time:** A form UI can be built in a fraction of the time. The core pipeline is the learning priority — not UI sophistication.
+The original plan specified a form-based UI. After Phase 5 proved the pipeline end-to-end, a conversational chat interface was chosen instead. Missing fields are common in natural-language descriptions and a chat loop collects them more naturally than a form. Streaming the explanation token-by-token is a first-class requirement that belongs in a chat bubble.
 
-### When a chat UI becomes justified:
-- The pipeline is proven end-to-end and reliable
-- Users are returning frequently and want natural back-and-forth
-- Multiple rounds of clarification are needed (which EDA and Phase 3 testing will reveal)
+### Rev 2: Embedded HTML → Standalone React App (ADR-009)
 
----
+The chat UI was initially implemented as a single `app/static/index.html` file using React 18 + Babel Standalone + Tailwind Play CDN, served directly by the FastAPI backend. This approach failed to deliver reliable token-by-token streaming:
 
-## Recommended MVP UI Flow
+1. **Babel Standalone transpiles JSX in the browser.** This runtime transformation interacts poorly with React 18's automatic batching — `flushSync` and other batching workarounds did not produce visible per-token rendering.
+2. **No build step means no control over the React runtime.** Production React apps use a bundler (Vite, webpack) that produces optimized output where `flushSync`, `startTransition`, and streaming patterns work as documented.
+3. **CDN dependency for every page load.** React, ReactDOM, Babel, and Tailwind are all fetched from third-party CDNs on every page load. This is fragile and slow.
+4. **Debugging is difficult.** Babel Standalone source maps are limited. Browser DevTools show transpiled code, not the original JSX.
 
-### Step 1: Input Form
-**Purpose:** Collect the property description  
-**Contents:**
-- Page title: "Property Price Estimator"
-- Large text area: "Describe the property" (placeholder: "e.g., 3-bedroom house, built in 1995, finished basement, 2-car garage, northwest Ames...")
-- "Estimate Price" button
+A vanilla JS debug page (`debug-stream.html`) confirmed that the FastAPI SSE backend streams tokens correctly — each `event: token` arrives as a separate SSE event with correct timing. The streaming problem is exclusively in the React CDN frontend layer.
 
-**On submit:**
-- Disable button while request is in-flight
-- Show loading spinner with message: "Extracting property details..."
-- Call `POST /predict` with the description
+**Decision:** The frontend is extracted to a standalone React application (Vite + React 18 + TypeScript + plain CSS) in a separate directory. The FastAPI backend becomes a pure API server. See ADR-009.
 
 ---
 
-### Step 2a: Missing Fields Form (Conditional)
-**Displayed when:** API returns `status: "incomplete"` with `missing_required_fields` list  
-**Purpose:** Collect the fields the LLM could not extract  
-**Contents:**
-- Header: "We need a few more details"
-- Subheader: "The following fields couldn't be determined from your description. Please fill them in:"
-- One input control per missing field (see "Control Types" below)
-- "Get Estimate" button
+## Conversational Flow
 
-**Control types by feature type:**
-| Feature Type | Control |
-|-------------|---------|
-| Integer (e.g., bedrooms, year) | Number input with min/max hints |
-| Float (e.g., area in sq ft) | Number input |
-| Enum/categorical (e.g., neighborhood, quality rating) | Dropdown select with all valid options |
-| Boolean (e.g., central air) | Toggle or Yes/No dropdown |
+### Turn structure
 
-**On submit:**
-- Call `POST /predict` again with original description + `supplemental_features`
+Every user message goes through the same pipeline on the server:
+
+```
+User message
+    │
+    ▼
+[LLM: intent classification + feature extraction]
+    │
+    ├─ intent = "chat"      → stream conversational reply → done
+    │
+    └─ intent = "property"
+            │
+            ▼
+        merge extracted_features with accumulated_features (client-side state)
+            │
+            ├─ required fields still missing
+            │       └─ stream ask-for-missing reply → done
+            │
+            └─ all required fields present
+                    ├─ emit prediction event  (ML inference, ~instant)
+                    └─ stream explanation tokens (Stage 3 LLM)
+```
+
+### Example conversation
+
+| Turn | User | Assistant |
+|------|------|-----------|
+| 1 | "Hello" | "Hello! I'm a real estate pricing assistant for Ames, Iowa properties. Describe any property and I'll estimate its current market value." |
+| 2 | "I have a house in North Ames built in 1990" | "Got it — North Ames, built in 1990. I still need a couple of details: how large is the above-grade living area (sq ft), and how would you rate the overall quality on a 1–10 scale?" |
+| 3 | "About 1,800 sq ft, I'd say quality 7" | [prediction card renders: **$183,400**] [explanation streams]: "This 1,800 sq ft home in North Ames..." |
+| 4 | "What if the quality was a 9?" | "If we raise the overall quality to 9, the estimate increases to **$221,500**." *(re-runs prediction with OverallQual=9)* |
 
 ---
 
-### Step 2b: Pipeline Error State
-**Displayed when:** API returns `status: "error"`  
-**Contents:**
-- Error icon
-- Human-readable error message from API response
-- "Try Again" button that resets to Step 1
+## New Backend Components Required
+
+### 1. `POST /chat` endpoint — SSE stream
+**File:** `app/routes/chat.py`
+
+**Request body:**
+```json
+{
+  "message": "About 1,800 sq ft, I'd say quality 7",
+  "history": [
+    { "role": "user",      "content": "Hello" },
+    { "role": "assistant", "content": "Hello! I'm a real estate pricing assistant..." },
+    { "role": "user",      "content": "I have a house in North Ames built in 1990" },
+    { "role": "assistant", "content": "Got it — North Ames, built in 1990..." }
+  ],
+  "accumulated_features": {
+    "YearBuilt": 1990,
+    "Neighborhood": "NAmes"
+  }
+}
+```
+
+**Response:** `text/event-stream` (SSE)
+
+| Event | Payload | When emitted |
+|-------|---------|-------------|
+| `reply` | `{"text": "..."}` | Conversational reply or ask-for-fields reply (not streamed per-token — single event) |
+| `prediction` | `{"prediction_usd": 183400, "features": {...}}` | Immediately when ML inference completes |
+| `token` | `{"text": "..."}` | Each explanation chunk from Stage 3 LLM |
+| `done` | `{}` | End of stream |
+| `error` | `{"code": "...", "message": "..."}` | Any failure |
+
+**Why `reply` is not token-streamed:** Short conversational replies (1-3 sentences) feel jarring as partial tokens. The explanation is the meaningful streaming experience — it is long and benefits from progressive rendering.
+
+### 2. `app/services/chat.py` — Chat orchestration service
+
+Responsibilities:
+1. Call LLM with the chat prompt (non-streaming) to get `{intent, reply, extracted_features}`
+2. Validate and merge `extracted_features` with `accumulated_features`
+3. If `intent == "chat"` or missing fields remain → emit `reply` event → emit `done`
+4. If all required fields present → run `predict_price()` → emit `prediction` event → call explanation LLM with streaming → forward each token as `token` event → emit `done`
+
+The service must accept the LLM client as a parameter (testability requirement per LLM instructions).
+
+### 3. `prompts/chat_v1.md` — Chat extraction + intent prompt
+
+This is the most important new artifact. The prompt must instruct the LLM to:
+
+- Return a **strict JSON object** (never prose):
+  ```json
+  {
+    "intent": "property" | "chat",
+    "reply": "...",
+    "extracted_features": { "GrLivArea": 1800, "OverallQual": 7, ... } | null
+  }
+  ```
+- For `intent = "chat"`: provide a helpful, concise reply; `extracted_features` must be `null`
+- For `intent = "property"`: extract any property features mentioned in the new message (only the new message, not history); return only the fields that can be confidently inferred; `null` for anything uncertain
+- **Must include:** list of already-known features (injected from `accumulated_features`) so the LLM does not re-ask for them
+- **Must include:** list of still-missing required fields so the LLM asks for exactly those
+- **Anti-hallucination:** must instruct the LLM to return `null` for any field not clearly stated — not to guess
+- **Valid enum values must be listed** for `Neighborhood` and `Exterior1st`
+- Must follow prompt file header format (name, version, date, purpose, changes)
+
+### 4. `app/schemas/chat.py` — Request/response schemas
+
+```python
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., max_length=2000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=50)
+    accumulated_features: dict[str, Any] = Field(default_factory=dict)
+```
+
+`max_length=2000` on message follows the LLM instructions rule: never pass user input to LLM without length validation. `max_length=50` on history prevents unbounded context growth.
 
 ---
 
-### Step 3: Results Display
-**Displayed when:** API returns `status: "complete"`  
-**Contents:**
+## Frontend: Standalone React Application
 
-**Section 1 — Prediction card:**
-```
-Estimated Property Value
-$243,500
-```
-(Large, prominent, center-aligned)
+### Why standalone (see ADR-009)
 
-**Section 2 — Explanation:**
-```
-[Full 2–4 paragraph explanation from Stage 2 LLM]
-```
+The Babel Standalone CDN approach could not deliver reliable token-by-token streaming. A proper Vite + React 18 build produces bundled output where `requestAnimationFrame` yields, `flushSync`, and streaming patterns work correctly. The standalone app is created in a separate directory outside this project.
 
-**Section 3 (Optional/collapsible) — Extracted Features:**
-```
-Details we used:
-• Bedrooms above grade: 3
-• Year built: 1995
-• Garage capacity: 2 cars
-• Basement quality: Good
-...
-```
-Collapsed by default to avoid overwhelming the user; expandable with "Show details."
+### Stack
 
-**Section 4 — Reset:**
-- "Estimate Another Property" button that resets to Step 1
+- **Build tool:** Vite
+- **Framework:** React 18 (with proper build — not CDN)
+- **Language:** TypeScript
+- **Styling:** Plain CSS (co-located `.css` files per component)
+- **No additional libraries** — no state management library, no component library
 
----
+### Frontend responsibilities
 
-## Handling Missing Fields (Design Details)
+1. Render a chat thread: user messages right-aligned, assistant messages left-aligned
+2. Maintain client-side state: `messages[]`, `accumulatedFeatures{}`, `streaming`, `streamingText`
+3. Send `POST /chat` with `{message, history, accumulated_features}` on each turn
+4. Parse the SSE response stream using `fetch()` + `ReadableStream` + `TextDecoder`
+5. Dispatch events: `reply` → set reply text, `prediction` → render prediction card, `token` → append to streaming text with browser yield, `done` → commit message, `error` → show error bubble
+6. Yield to browser between token events (`requestAnimationFrame`) to guarantee per-token rendering
+7. Render prediction card inline in the chat thread (collapsible feature details)
+8. Character counter at 1800+, hard limit 2000
+9. Shift+Enter for newlines, Enter to send
+10. "New conversation" button resets all state
 
-When the API returns `missing_required_fields`, the UI must:
+### CORS
 
-1. Preserve the values already extracted — do not ask the user to re-describe the whole property
-2. Display only the missing fields — do not show all schema fields
-3. Provide helpful label text and units for each field (e.g., "Above-Grade Living Area (square feet)")
-4. Validate the filled-in values client-side where possible (e.g., year built must be a 4-digit number between 1800–2030)
-5. Merge the user-supplied values with the extracted features before the second API call
+The React dev server runs on a different port (e.g., `localhost:5173`) from the FastAPI backend (`localhost:8000`). The FastAPI backend must add CORS middleware to allow requests from the frontend origin.
+
+### API base URL
+
+The frontend reads the API URL from an environment variable (`VITE_API_URL`). Default: `http://localhost:8000`. In Docker, this can be overridden.
 
 ---
 
 ## Display of Extracted Values
-
-The extracted features section should be human-friendly, not raw schema field names:
 
 | Schema field | Display label |
 |-------------|--------------|
@@ -141,31 +206,34 @@ The extracted features section should be human-friendly, not raw schema field na
 | `MasVnrArea` | Masonry Veneer Area (sq ft) |
 | `Exterior1st` | Primary Exterior Material |
 
-A field-to-label mapping must be defined once and reused across all UI components.
-
 ---
 
-## Error States
+## Error Handling in the Chat UI
 
-| Scenario | UI Behavior | Message |
-|----------|------------|---------|
-| Text input is empty | Prevent submission (client-side validation) | "Please describe a property before submitting." |
-| API returns 422 (validation error) | Show error card | "Your description couldn't be processed. Try adding more details." |
-| API returns 500 | Show error card | "An internal error occurred. Please try again." |
-| API call times out (>15s) | Show timeout card | "This is taking longer than expected. Please try again." |
-| Missing fields form submitted with empty values | Client validation, prevent submission | Required field labels turn red |
-| Explanation unavailable (fallback message from API) | Show prediction + fallback message | "Explanation temporarily unavailable." |
+Errors surface as assistant chat bubbles, not page-level error cards. This keeps the conversation context visible and lets the user continue.
+
+| Scenario | SSE event | Assistant bubble message |
+|----------|-----------|--------------------------|
+| Message is empty (client-side) | n/a — prevented before fetch | *(submission blocked)* |
+| Message exceeds 2,000 chars | n/a — prevented before fetch | *(submission blocked with counter)* |
+| LLM returns invalid JSON or times out | `error` event | "I had trouble understanding that — could you rephrase?" |
+| ML model not loaded (503) | `error` event | "The estimation service isn't ready yet. Please try again in a moment." |
+| Unexpected server error (500) | `error` event | "Something went wrong on my end. Please try again." |
+| Explanation LLM fails mid-stream | `error` event after partial tokens | Prediction card still shown; "Explanation temporarily unavailable." appended |
+| History length > 50 turns | client-side | Oldest turns pruned before sending (sliding window) |
 
 ---
 
 ## Technical Notes
 
-- **Implementation approach chosen:** React 18 + Babel Standalone + Tailwind Play CDN, served as a single self-contained `app/static/index.html` file via FastAPI `GET /`. No npm, no build step, no new Python dependencies required.
-- The UI uses a conversation-like presentation: natural-language copy, staged loading feedback ("Thinking...", "Studying the market...", "Interpreting results..."), and a step-by-step interaction flow.
-- Missing field collection is handled with a structured form but with conversational copy ("Got it! Just a few more details.") that makes the interaction feel guided rather than mechanical.
-- The UI communicates with the FastAPI backend only through the documented `/predict` endpoint. No direct model or LLM calls from the frontend.
-- The UI is served by the same Docker container as the API (no separate frontend container).
-- The Babel and Tailwind CDN warnings about production use are expected and acceptable for MVP.
+- **Frontend stack:** Vite + React 18 + TypeScript + plain CSS — standalone app in a separate directory, with a proper build step.
+- **Streaming transport:** `fetch()` + `ReadableStream` (not `EventSource` — SSE via EventSource is GET-only). The client reads the stream body with a `TextDecoder`, splits on `\n\n`, and dispatches each SSE event by type. `requestAnimationFrame` yields between token events to force per-token rendering.
+- **Server-sent events:** FastAPI `StreamingResponse` with `media_type="text/event-stream"`. Each event is `event: <type>\ndata: <json>\n\n`.
+- **State is client-side:** `accumulatedFeatures` and `history` live in React state and are sent with every `/chat` request. The `/chat` endpoint is stateless on the server — no sessions, no server-side storage.
+- **CORS:** FastAPI `CORSMiddleware` added with allowed origin matching the frontend dev server (configurable via env var).
+- **`/predict` endpoint unchanged:** The existing synchronous `/predict` endpoint continues to work. `/chat` is additive. Tests for `/predict` remain valid.
+- **Prompt versioning:** `prompts/chat_v1.md` follows the same header convention as existing prompts. The active version is configured via `settings.chat_prompt_version`.
+- **No static file serving.** The FastAPI backend does not serve HTML, CSS, or JS. `app/routes/ui.py` and `app/static/` are removed.
 
 ---
 
@@ -173,38 +241,30 @@ A field-to-label mapping must be defined once and reused across all UI component
 
 Phase 6 is complete only when ALL of the following are true:
 
-1. [x] Input form renders and submits a description to the API — verified
-2. [ ] Missing fields form renders correctly for at least one real missing-field scenario
-3. [x] Results page displays prediction and explanation correctly — verified
-4. [ ] All error states from the table above have been tested and render correctly
-5. [x] Extracted features section is displayed (even if collapsed) — verified
-6. [x] Full end-to-end flow works from browser without touching the terminal — verified
-7. [x] UI runs inside the Docker container — verified at http://localhost:8000
+1. [ ] `POST /chat` endpoint returns SSE events — verified with curl
+2. [ ] Greeting input ("Hello") receives a conversational reply, not an error
+3. [ ] Vague property description triggers a follow-up question for the missing required fields
+4. [ ] Conversation accumulates features across turns until all required fields are known
+5. [ ] Prediction is returned when all required fields are present
+6. [ ] Explanation streams token-by-token (verified with curl: individual `event: token` lines)
+7. [ ] Error events are returned for LLM failure and model-not-ready scenarios
+8. [ ] Standalone React app renders chat UI in browser and communicates with `POST /chat`
+9. [ ] Explanation tokens render word-by-word in the React chat bubble (not popping in all at once)
+10. [ ] Full end-to-end flow works from browser: greeting → property description → missing field follow-up → prediction + streamed explanation
+11. [ ] `/predict` endpoint still passes all existing tests (no regression)
 
 ---
 
-## Phase 6b — Streaming (Post Phase 6)
+## Files Changed by This Phase
 
-> **Status:** Not Started — depends on Phase 6 complete
-
-**Goal:** Stream the LLM explanation token-by-token to the browser, rendering it in real time rather than waiting for the full response. This eliminates the 10–20 second wait for Stage 3 and gives the UI a live, ChatGPT-like feel.
-
-**What changes:**
-
-| Component | Current (Phase 6) | Phase 6b |
-|-----------|-------------------|----------|
-| `/predict` endpoint | Returns complete JSON when done | Returns prediction immediately; explanation streamed via SSE or chunked transfer |
-| UI | Shows "Interpreting results..." until response complete | Renders explanation words as they arrive |
-| API contract | Single JSON response | Split: prediction JSON first, then SSE stream for explanation text |
-
-**Implementation approach:**
-- Add `POST /predict/stream` endpoint that uses FastAPI `StreamingResponse` with `text/event-stream` content type
-- Run Stages 1 + 2 synchronously; on completion emit a prediction event with `prediction_usd` and `features`
-- Run Stage 3 (LLM explanation) with `stream=True` on the OpenAI SDK; forward each chunk as an SSE event
-- UI: use the browser `EventSource` API to consume the stream; update the explanation text incrementally
-
-**Acceptance criteria:**
-- [ ] `POST /predict/stream` returns the prediction price within 1s of extraction completing
-- [ ] Explanation text begins rendering in the browser within 500ms of the prediction being returned
-- [ ] Existing `POST /predict` endpoint continues working unchanged (non-streaming consumers unaffected)
-- [ ] Streaming works inside Docker container
+| File | Action | Notes |
+|------|--------|-------|
+| `app/routes/chat.py` | Create | `POST /chat` → SSE stream |
+| `app/services/chat.py` | Create | Chat orchestration: intent routing, feature accumulation, predict + stream |
+| `app/schemas/chat.py` | Create | `ChatMessage`, `ChatRequest` Pydantic models |
+| `prompts/chat_v1.md` | Create | Combined intent + extraction prompt |
+| `app/config.py` | Update | Add `chat_prompt_version`, `cors_origin` settings |
+| `app/main.py` | Update | Register `chat_router`, add CORS middleware, remove `ui_router` |
+| `app/routes/ui.py` | Delete | No longer serves static files |
+| `app/static/` | Delete | Frontend is a standalone app |
+| *Standalone React app* | Create | Separate directory, Vite + React 18 + TS + Tailwind |

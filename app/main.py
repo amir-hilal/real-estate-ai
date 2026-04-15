@@ -10,6 +10,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -39,11 +40,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.cors_origin],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 from app.routes.extract import router as extract_router
 from app.routes.predict import router as predict_router
-from app.routes.ui import router as ui_router
+from app.routes.chat import router as chat_router
 
-app.include_router(ui_router)
+app.include_router(chat_router)
 app.include_router(extract_router)
 app.include_router(predict_router)
 
