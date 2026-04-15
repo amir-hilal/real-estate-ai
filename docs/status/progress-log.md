@@ -37,6 +37,44 @@
 
 ---
 
+### 2026-04-15 — MVP Complete — All 7 Phases Done
+
+**Phase:** Phase 7 — Testing, Demo, and Delivery  
+**Duration:** ~3 sessions (Phase 6 + Phase 7 combined)  
+**Status change:** Phase 6 In Progress → Phase 7 Complete (MVP Done)
+
+**What was done:**
+- Completed Phase 6 (UI Flow):
+  - `POST /chat` SSE endpoint with intent routing, feature merging, prediction, and streamed explanation
+  - Chat orchestration service (`app/services/chat.py`) with `_coerce_scalar()` for range/list values
+  - Standalone React app (Vite + React 18 + TypeScript + plain CSS) in separate directory
+  - CORS middleware added to FastAPI backend
+  - Full end-to-end conversational flow verified in browser
+- Iterated chat prompt from v1 to v2:
+  - v1 issues: LLM didn't recognize "2,000 sq ft" as GrLivArea; asked about optional features while required features were missing; said "I have all details" when YearBuilt was never provided
+  - v2 fixes: required-field prioritization (rule 9), inline mapping hints ("2,000 sq ft = GrLivArea 2000"), bold guard against false completeness claims, "go ahead" handling example
+- Created prompt versioning tracker (`docs/prompt-versions.md`) with per-version changes and test results
+- Fixed multiple bugs: duplicate user message in history (deduplication guard), range/list values from LLM (coercion), React 18 batching (flushSync on frontend)
+- All documentation updated: phase-06 exit criteria, mvp-master-checklist, current-status, progress-log
+- 78 tests passing, Docker container healthy
+
+**Decisions made:**
+- Chat prompt v2 over v1 — v1 failed to prioritize required fields and hallucinated completeness. v2 adds explicit rules and examples. Both versions kept for reference.
+- ADR-008: Chat UI over form-based UI — conversational flow collects missing fields more naturally
+- ADR-009: Standalone React app over embedded HTML — Babel Standalone cannot deliver reliable per-token streaming
+
+**Discoveries / surprises:**
+- Small local LLMs (phi4-mini) are sensitive to prompt structure for multi-turn chat. Without explicit examples showing the exact behavior (e.g., "go ahead" with missing fields), the LLM defaults to being agreeable rather than enforcing requirements.
+- React 18's automatic batching interacts poorly with SSE streaming — `flushSync` is required for per-token rendering.
+- Frontend state updates from SSE events have a one-turn delay due to React batching. The `accumulated_features` sent back to the backend are always one turn stale unless the frontend uses `flushSync` or functional state updates.
+
+**Next session should start with:**
+1. Review `docs/context/future-considerations.md`
+2. Choose first post-MVP enhancement to implement
+
+**Blockers:**
+- None
+
 ### 2026-04-15 — Phase 5 Complete — Docker Build Verified, End-to-End Pipeline Confirmed
 
 **Phase:** Phase 5 — API & Containerization  

@@ -130,31 +130,31 @@
 
 - [x] `POST /chat` SSE endpoint created and returns events (reply, prediction, token, done, error) — verified with curl
 - [x] Chat orchestration service (`app/services/chat.py`) handles intent routing, feature merging, prediction, and streamed explanation
-- [x] Chat prompt (`prompts/chat_v1.md`) covers intent classification + feature extraction with anti-hallucination rules
+- [x] Chat prompt (`prompts/chat_v2.md`) covers intent classification + feature extraction with anti-hallucination rules, required-field prioritization, and "go ahead" handling
 - [x] Backend SSE streaming verified: each explanation token arrives as a separate `event: token` line — confirmed with curl
-- [ ] CORS middleware added to FastAPI backend for cross-origin frontend requests
-- [ ] Standalone React app (Vite + React 18 + TypeScript + plain CSS) created and running
-- [ ] Greeting input ("Hello") receives a conversational reply, not an error — verified in React app
-- [ ] Vague property description triggers follow-up question for missing required fields — verified in React app
-- [ ] Conversation accumulates features across turns until all required fields are known — verified in React app
-- [ ] Prediction card renders inline in the chat thread when all required fields are present — verified in React app
-- [ ] Explanation streams token-by-token into the chat bubble (not popping in all at once) — verified in React app
-- [ ] Error bubbles appear in the thread for LLM failure and model-not-ready scenarios — verified in React app
-- [ ] Full end-to-end flow works from browser: greeting → property → missing fields → prediction + streamed explanation
-- [ ] `/predict` endpoint still passes all existing tests (no regression)
-- [ ] Phase 6 exit criteria all checked in `docs/phases/phase-06-ui-flow.md`
+- [x] CORS middleware added to FastAPI backend for cross-origin frontend requests
+- [x] Standalone React app (Vite + React 18 + TypeScript + plain CSS) created and running
+- [x] Greeting input ("Hello") receives a conversational reply, not an error — verified in React app
+- [x] Vague property description triggers follow-up question for missing required fields — verified in React app
+- [x] Conversation accumulates features across turns until all required fields are known — verified in React app
+- [x] Prediction card renders inline in the chat thread when all required fields are present — verified in React app
+- [x] Explanation streams token-by-token into the chat bubble (not popping in all at once) — verified in React app
+- [x] Error bubbles appear in the thread for LLM failure and model-not-ready scenarios — verified in React app
+- [x] Full end-to-end flow works from browser: greeting → property → missing fields → prediction + streamed explanation
+- [x] `/predict` endpoint still passes all existing tests (no regression) — 78 tests passing
+- [x] Phase 6 exit criteria all checked in `docs/phases/phase-06-ui-flow.md`
 
 ---
 
 ## Phase 7 — Testing, Demo, and Delivery
 
-- [ ] All 3 demo inputs (happy path, partial, invalid) tested and produce correct outcomes
-- [ ] All artifacts from the artifact table in Phase 7 doc are present and verified
-- [ ] All review questions in Phase 7 doc can be answered from memory
-- [ ] `docker-compose up` starts the full system cleanly on a clean pull
-- [ ] `docs/status/current-status.md` updated to reflect completion
-- [ ] `docs/status/progress-log.md` has a final entry
-- [ ] Master checklist (this file) is 100% checked ✅
+- [x] All 3 demo inputs (happy path, partial, invalid) tested and produce correct outcomes
+- [x] All artifacts from the artifact table in Phase 7 doc are present and verified
+- [x] All review questions in Phase 7 doc can be answered from memory
+- [x] `docker-compose up` starts the full system cleanly on a clean pull
+- [x] `docs/status/current-status.md` updated to reflect completion
+- [x] `docs/status/progress-log.md` has a final entry
+- [x] Master checklist (this file) is 100% checked ✅
 
 ---
 

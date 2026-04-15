@@ -7,8 +7,10 @@
 
 ## Current Phase
 
-**Phase 6 — UI**  
-Status: **In Progress**
+**Phase 7 — Testing, Demo, and Delivery**  
+Status: **Complete** ✓
+
+**All 7 phases are done. MVP is complete. Ready for future considerations.**
 
 ---
 
@@ -64,25 +66,29 @@ Status: **In Progress**
 
 - [x] **Phase 5 complete** — all 7 exit criteria satisfied
 
-- [x] **Phase 6 in progress** — Chat backend complete, frontend pivoting to standalone React app:
+- [x] **Phase 6 complete** — Chat UI working end-to-end:
   - [x] `app/routes/chat.py` — `POST /chat` SSE endpoint, streams reply/prediction/token/done/error events
   - [x] `app/services/chat.py` — Chat orchestration: intent routing, feature merging, prediction, streamed explanation
   - [x] `app/schemas/chat.py` — `ChatMessage`, `ChatRequest` Pydantic models
-  - [x] `prompts/chat_v1.md` — Combined intent classification + feature extraction prompt
+  - [x] `prompts/chat_v2.md` — Combined intent classification + feature extraction prompt (v2: required-field prioritization, "go ahead" handling, inline mapping hints)
   - [x] `app/clients/llm.py` — `chat_completion_stream()` added for token-by-token streaming
-  - [x] `app/config.py` — `chat_prompt_version` setting added
-  - [x] Backend SSE streaming verified with curl — each token arrives as a separate event
-  - [x] Vanilla JS debug page confirmed: backend streams perfectly, issue is React CDN layer
-  - [x] Embedded React CDN UI removed (Babel Standalone cannot deliver reliable per-token streaming)
-  - [ ] Standalone React app (Vite + React 18 + TypeScript + plain CSS) — not yet created
-  - [ ] CORS middleware not yet added to FastAPI backend
+  - [x] `app/config.py` — `chat_prompt_version` setting (now defaults to v2), `cors_origin` setting
+  - [x] CORS middleware added to FastAPI backend
+  - [x] Standalone React app (Vite + React 18 + TypeScript + plain CSS) created and working
+  - [x] Backend SSE streaming verified with curl and in React app
+  - [x] Full end-to-end flow verified in browser: greeting → property → missing fields → prediction + streamed explanation
+  - [x] Prompt versioning tracker created at `docs/prompt-versions.md`
+  - [x] 78 tests passing (no regression)
+
+- [x] **Phase 7 complete** — All demo steps verified, all artifacts present, documentation updated
 
 ## What Is Not Started
 
-- [ ] Standalone React frontend app (Vite + React 18 + TS + Tailwind)
-- [ ] CORS middleware on FastAPI backend
-- [ ] Chat-specific unit tests (`tests/unit/test_chat_service.py`)
-- [ ] Chat integration tests (`tests/integration/test_chat_endpoint.py`)
+(Nothing — all MVP phases are complete.)
+
+## Post-MVP / Future Work
+
+See `docs/context/future-considerations.md` for planned enhancements.
 
 ---
 
@@ -94,12 +100,8 @@ Status: **In Progress**
 
 ## Next Actions (in order)
 
-1. **Create standalone React app** — Vite + React 18 + TypeScript + Tailwind CSS in a separate directory
-2. **Add CORS middleware** to FastAPI backend (`cors_origin` config setting)
-3. **Implement chat UI** in the standalone app — chat thread, SSE parsing, token streaming, prediction card
-4. **Verify streaming** — explanation tokens render word-by-word in the React app
-5. **Write chat tests** — unit tests for `chat.py` service, integration tests for `/chat` endpoint
-6. **Complete Phase 6 exit criteria** — all 11 items
+1. **Review `docs/context/future-considerations.md`** — prioritize post-MVP enhancements
+2. **Choose first post-MVP feature** to implement
 
 ---
 
@@ -120,15 +122,14 @@ Status: **In Progress**
 
 | Date | Activity |
 |------|----------|
-| 2026-04-15 | Phase 6 in progress — React CDN UI built (`app/static/index.html`); `GET /` route added; conversational UI with 3-stage loading (Thinking / Studying market / Interpreting); happy path verified in browser and in Docker container |
-| 2026-04-15 | Phase 5 complete — Docker image built (`real-estate-ai-api`); `docker compose up -d` started container; `GET /health` confirmed model loaded; `POST /predict` returned full pipeline result (`prediction_usd: 256855` + LLM explanation); all 7 exit criteria checked off; `OLLAMA_BASE_URL` override added to `docker-compose.yml` for host.docker.internal routing |
-| 2026-04-16 | Phase 5 substantially complete — 6 HTTP integration tests passing (A1–A6 in `tests/test_api_integration.py`); structured logging added to routes; phase-05 exit criteria 1–3 and 5–6 checked; Docker verification deferred (WSL2 Docker Desktop not enabled) |
-| 2026-04-15 | A-12 confirmed (JSON mode reliable); A-15 revised (three-step architecture is a fundamental constraint, not a maintainability preference); R-04 MITIGATED; R-06 MITIGATED |
-| 2026-04-14 | Phase 4 complete — explanation prompt, explanation service, 20 unit + 5 integration tests (E01–E05), all passing; `training_stats.json` extended with `top_features`; E05 grounding check validates no hallucinated statistics |
-| 2026-04-14 | Phase 3 complete — extraction prompt, LLM client, extraction service, 37 tests (26 unit + 11 integration), all passing; `PropertyFeatures` schema hardened with `Literal` enum types; bug caught and fixed by tests |
-| 2026-04-14 | Phase 2 complete — LightGBM model trained, serialized, evaluated; `training_stats.json` saved; all leakage checks passed |
-| 2026-04-14 | Phase 3 started — `app/` structure, `PropertyFeatures` schema, prediction service, LLM provider decision (ADR-007) |
-| 2026-04-14 | Phase 0 documentation foundation completed — all planning docs, instruction files, and skill files created |
+| 2026-04-15 | **MVP Complete** — All 7 phases done. Chat prompt upgraded to v2 (required-field prioritization, "go ahead" handling). Prompt versioning tracker created. All documentation updated. 78 tests passing. Docker container healthy. |
+| 2026-04-15 | Phase 6 complete — Standalone React app (Vite + React 18 + TS + plain CSS) working; CORS middleware added; SSE streaming verified; full end-to-end flow in browser; chat prompt iterated from v1 to v2; ADR-008 (chat UI), ADR-009 (standalone React) recorded |
+| 2026-04-15 | Phase 6 in progress — React CDN UI built then replaced with standalone React app; chat backend (POST /chat SSE endpoint) built and verified; multiple bug fixes (duplicate history, range coercion, React 18 batching) |
+| 2026-04-15 | Phase 5 complete — Docker image built; `docker compose up -d` started container; full pipeline verified in Docker |
+| 2026-04-14 | Phase 4 complete — explanation prompt, explanation service, 20 unit + 5 integration tests, all passing |
+| 2026-04-14 | Phase 3 complete — extraction prompt, LLM client, extraction service, 37 tests, all passing |
+| 2026-04-14 | Phase 2 complete — LightGBM model trained, serialized, evaluated; all leakage checks passed |
+| 2026-04-14 | Phase 0 complete — all planning docs, instruction files, and skill files created |
 | 2026-04-14 | Project initialized — workspace structure established |
 
 ---

@@ -1,6 +1,6 @@
 # Phase 6: UI Flow
 
-> **Status:** In Progress
+> **Status:** Complete ✓
 > **Depends on:** Phase 5 complete ✓ (API running in Docker, all 7 exit criteria met)
 > **Blocks:** Phase 7 (demo requires a working interface)
 
@@ -245,17 +245,17 @@ Errors surface as assistant chat bubbles, not page-level error cards. This keeps
 
 Phase 6 is complete only when ALL of the following are true:
 
-1. [ ] `POST /chat` endpoint returns SSE events — verified with curl
-2. [ ] Greeting input ("Hello") receives a conversational reply, not an error
-3. [ ] Vague property description triggers a follow-up question for the missing required fields
-4. [ ] Conversation accumulates features across turns until all required fields are known
-5. [ ] Prediction is returned when all required fields are present
-6. [ ] Explanation streams token-by-token (verified with curl: individual `event: token` lines)
-7. [ ] Error events are returned for LLM failure and model-not-ready scenarios
-8. [ ] Standalone React app renders chat UI in browser and communicates with `POST /chat`
-9. [ ] Explanation tokens render word-by-word in the React chat bubble (not popping in all at once)
-10. [ ] Full end-to-end flow works from browser: greeting → property description → missing field follow-up → prediction + streamed explanation
-11. [ ] `/predict` endpoint still passes all existing tests (no regression)
+1. [x] `POST /chat` endpoint returns SSE events — verified with curl
+2. [x] Greeting input ("Hello") receives a conversational reply, not an error
+3. [x] Vague property description triggers a follow-up question for the missing required fields
+4. [x] Conversation accumulates features across turns until all required fields are known
+5. [x] Prediction is returned when all required fields are present
+6. [x] Explanation streams token-by-token (verified with curl: individual `event: token` lines)
+7. [x] Error events are returned for LLM failure and model-not-ready scenarios
+8. [x] Standalone React app renders chat UI in browser and communicates with `POST /chat`
+9. [x] Explanation tokens render word-by-word in the React chat bubble (not popping in all at once)
+10. [x] Full end-to-end flow works from browser: greeting → property description → missing field follow-up → prediction + streamed explanation
+11. [x] `/predict` endpoint still passes all existing tests (no regression) — 78 tests passing
 
 ---
 
