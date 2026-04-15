@@ -48,10 +48,10 @@
 
 | ID | Assumption | Basis | Risk if Wrong |
 |----|-----------|-------|---------------|
-| A-16 | Synchronous HTTP request handling is acceptable for MVP given expected latency of 3–8 seconds | MVP scope decision (ADR-002) | If users need faster responses, an async polling approach would be required |
-| A-17 | FastAPI + Uvicorn is sufficient for serving this system in a single-process, single-container setup | Well-established | Multi-process or load balancing not needed at MVP |
-| A-18 | Docker + docker-compose is sufficient for local deployment; no Kubernetes is required | MVP scope | Cloud deployment would require Helm or similar; not in scope |
-| A-19 | The LLM API key will be available via environment variable; no secrets manager is needed | MVP simplicity | If security requirements change, AWS Secrets Manager or Vault would be needed |
+| A-16 | ~~Synchronous HTTP request handling is acceptable for MVP given expected latency of 3–8 seconds~~ **CONFIRMED** — SSE streaming eliminates perceived latency. Reply tokens stream immediately; explanation tokens stream word-by-word. Total pipeline time ~10–20s but user sees content within 2–3s. | ADR-002, verified 2026-04-15 | N/A |
+| A-17 | ~~FastAPI + Uvicorn is sufficient for serving this system in a single-process, single-container setup~~ **CONFIRMED** — Single container serves all endpoints (health, extract, predict, chat). Handles 1 concurrent user without issue. Docker image runs on local machine and AWS. | Verified 2026-04-15 | N/A |
+| A-18 | ~~Docker + docker-compose is sufficient for local deployment; no Kubernetes is required~~ **CONFIRMED** — `docker compose up` runs the full system locally. AWS deployment uses a single container (ECS Fargate or EC2). No orchestration needed at this scale. | Verified 2026-04-15 | N/A |
+| A-19 | ~~The LLM API key will be available via environment variable; no secrets manager is needed~~ **CONFIRMED** — `.env` file locally; environment variables in AWS (ECS task definition or EC2 environment). Groq API key passed as `GROQ_API_KEY` env var. No secrets manager needed for MVP. | Verified 2026-04-15 | N/A |
 
 ---
 
@@ -59,8 +59,16 @@
 
 | ID | Assumption | Basis | Risk if Wrong |
 |----|-----------|-------|---------------|
-| A-20 | A simple browser-based form UI is sufficient for MVP demonstration | ADR-004 | If stakeholders require a polished UI, this requires significant additional scope |
-| A-21 | Form-based missing-field collection is adequate — no conversational back-and-forth is needed | MVP scope | If user testing shows confusion, a multi-step wizard UI may be needed |
+| A-20 | ~~A simple browser-based form UI is sufficient for MVP demonstration~~ **SUPERSEDED** — Replaced by conversational chat UI (ADR-008). Form-based UI could not handle arbitrary input (greetings, questions) or the missing-field conversation loop naturally. | ADR-008, 2026-04-15 | N/A |
+| A-21 | ~~Form-based missing-field collection is adequate — no conversational back-and-forth is needed~~ **SUPERSEDED** — Missing fields are collected via natural-language conversation in the chat UI. Testing confirmed >50% of descriptions require follow-up — conversational collection is necessary. | ADR-008, 2026-04-15 | N/A |
+
+### About Deployment (Post-MVP)
+
+| ID | Assumption | Basis | Risk if Wrong |
+|----|-----------|-------|---------------|
+| A-22 | Google Cloud Run is suitable for hosting the FastAPI Docker container in production | Generous free tier (2M req/month); runs Docker natively; auto HTTPS; SSE works; `ENVIRONMENT=production` switches to Groq LLM. Supersedes original AWS assumption — see ADR-011. | If Cloud Run free tier is exhausted, AWS (see `docs/deployment/aws-guide.md`) or Railway are alternatives |
+| A-23 | Vercel is suitable for hosting the standalone React frontend | Static site / serverless hosting; free tier adequate for demo; automatic deployments from Git | If Vercel free tier is insufficient, Netlify or Cloudflare Pages are equivalent alternatives |
+| A-24 | The Ollama LLM provider is not available in cloud deployment — production must use Groq or another hosted LLM | Ollama requires a local GPU or CPU-heavy server; not practical on standard cloud VMs | If a GPU instance is provisioned, Ollama could run alongside the API container |
 
 ---
 

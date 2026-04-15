@@ -1,7 +1,7 @@
 # Future Considerations: Post-MVP Architecture
 
-> **Purpose:** Clearly separate what is in scope for MVP from what belongs in a future version.  
-> **Rule:** Nothing in this document is allowed to influence Phase 0–7 implementation.  
+> **Purpose:** Separate what was built in MVP from what belongs in future phases.  
+> **Status:** Sections 2–4 are **Planned — Next Phase**. Sections 1, 5–9 remain Post-MVP.  
 > **Why this file exists:** To prevent scope creep by giving future ideas a home outside the active plan.
 
 ---
@@ -10,99 +10,168 @@
 
 > Add complexity only when a specific, named problem demands it.
 
-Every item in this document was deliberately excluded from MVP. The reason is not that these ideas are bad — it is that they solve problems we do not yet have. Adding them before those problems exist produces systems that are harder to understand, harder to debug, and harder to change.
+Items in this document were deliberately excluded from MVP. With MVP complete and cloud deployment decided (ADR-011), three items now have concrete justification and are promoted to **Planned — Next Phase**: GCS storage, Keycloak auth, and agent/customer role separation.
 
-The signal to revisit any item below is: *"We have a specific, recurring, named problem that this solution would fix."* Not: *"This would be cool"* or *"Production systems usually have this."*
+The remaining items stay Post-MVP until a specific, recurring, named problem demands them.
 
 ---
 
 ## 1. Async / Background Task Processing
 
+### Status: **Post-MVP — Not Planned**
+
 ### What it means
-Instead of running the full pipeline (LLM extraction → ML prediction → LLM explanation) synchronously inside a single HTTP request, the work would be dispatched to a background worker. The client receives a job ID immediately and polls for the result.
+Instead of running the full pipeline synchronously inside a single HTTP request, work would be dispatched to a background worker (Celery + Redis). The client receives a job ID and polls for the result.
 
-### The typical stack
-- **Celery** as the distributed task queue
-- **Redis** as the message broker (queues tasks) and result backend (stores results)
-- A worker process separate from the API server
-- A polling or webhook mechanism for the frontend
+### Why it is not needed
+The system uses SSE streaming for all user-facing interactions (`POST /chat`). Each chat turn is a single LLM call (2–5s) that streams tokens back immediately — there is no long-running job to background. The prediction trigger on the final turn adds ML inference (instant) + explanation streaming (5–10s of streamed tokens), but the user sees content within 2–3s.
 
-### Why it is not in MVP
-The full pipeline takes approximately 3–8 seconds. This is acceptable for a demonstration system and for learning. Async infrastructure adds:
-- Two new services to configure and debug (Celery + Redis)
-- Complex failure handling (task retries, timeouts, dead letter queues)
-- New concepts (message brokers, worker concurrency) that distract from the core ML/LLM learning goals
+Celery/Redis would add two new services with no benefit:
+- Chat turns are short-lived HTTP connections, not backgroundable jobs
+- FastAPI's async event loop already handles concurrent I/O-bound LLM calls
+- SSE requires an open HTTP connection — incompatible with fire-and-forget task dispatch
+- The complexity cost (broker configuration, task retry logic, polling endpoints, worker containers) is not justified by any current or near-term problem
 
-### Signal to add it
-- A user submits a request and the UI becomes unresponsive for >10 seconds routinely
-- Multiple concurrent users exist and requests are queuing
-- Long-running batch jobs (e.g., re-training) are needed alongside real-time serving
+### Signal to revisit
+- Sustained >20 concurrent users causing request queuing (measure first)
+- Long-running batch jobs (e.g., model retraining) needed alongside live serving
+- Non-interactive bulk operations (e.g., CSV batch analysis) requested
 
 ---
 
-## 2. Object Storage (S3, MinIO)
+## 2. Object Storage (Google Cloud Storage)
+
+### Status: **Planned — Next Phase**
 
 ### What it means
-Instead of storing the serialized model artifact and training statistics file on the local filesystem (or inside the Docker image), they would be stored in an object storage bucket (AWS S3, Google Cloud Storage, or self-hosted MinIO). The application would download them at startup or reference them by URL.
+Instead of storing the serialized model artifact and training statistics file inside the Docker image, they are stored in a Google Cloud Storage (GCS) bucket. The application downloads them at startup.
 
-### Why it is not in MVP
-For one model serving one user locally:
-- The filesystem is perfectly adequate
-- S3 adds IAM, bucket policies, network dependencies, and SDK configuration
-- None of those problems exist yet
+### Why it was not in MVP
+For one model serving one user locally, the filesystem was perfectly adequate. GCS adds IAM, bucket policies, and SDK configuration.
 
-### Signal to add it
-- The model artifact needs to be versioned and shared across multiple server instances
-- Model retraining produces new artifacts that need to be promoted through an environment pipeline
-- The system is deployed to the cloud and cannot rely on local disk
+### Why it is needed now
+With Cloud Run deployment (ADR-011), the model artifact is COPY'd into the Docker image at build time. This means:
+- Every model update requires a full Docker image rebuild and redeploy
+- Multiple Cloud Run instances each carry a ~50MB model file in their image
+- No model versioning — rollback requires redeploying a previous image tag
+
+GCS solves these problems:
+- **Model versioning** — upload new `model.joblib` to GCS with a version key; roll back by pointing to a previous version
+- **Decoupled deployment** — update the model without rebuilding the Docker image
+- **Shared storage** — multiple Cloud Run instances pull the same artifact
+- **Future: retraining pipeline** — new model artifacts land in GCS automatically
+
+### Why GCS over S3
+The project runs on Google Cloud (Cloud Run — ADR-011). Using GCS keeps everything in the same ecosystem:
+- Cloud Run's default service account has GCS access with no extra configuration
+- No cross-cloud IAM or networking needed
+- `google-cloud-storage` Python SDK is lightweight (~5MB vs. boto3's ~70MB)
+- GCS free tier: 5GB storage, 5K Class A operations/month, 50K Class B operations/month
+
+### Implementation plan
+1. Create a GCS bucket (e.g., `real-estate-ai-artifacts`)
+2. Upload `model.joblib` and `training_stats.json` to GCS
+3. Add `google-cloud-storage` to `requirements.txt`
+4. Modify `app/main.py` lifespan to download from GCS if `MODEL_SOURCE=gcs` env var is set (local filesystem remains the default for development)
+5. Add `GCS_BUCKET`, `GCS_MODEL_KEY`, `GCS_STATS_KEY` to `app/config.py`
+6. Remove `COPY ml/artifacts/` from Dockerfile (only when GCS is the production default)
+7. IAM: Cloud Run service account gets `storage.objectViewer` role on the bucket (default service account may already have this)
+8. Add ADR documenting the decision
 
 ---
 
 ## 3. Authentication and Authorization (RBAC)
 
+### Status: **Planned — Next Phase**
+
 ### What it means
-- User login and session management (JWT tokens, OAuth2 flows)
-- Role-based access control: different permissions for different roles
-- The suggestion below about agent vs. customer separation implies distinct roles
+- User login and session management (JWT tokens, OAuth2 / OpenID Connect)
+- Role-based access control: two roles with different capabilities
+- Token validation middleware in FastAPI protecting all endpoints except `/health`
 
-### The likely future stack
-- **Keycloak** as the identity provider (handles OAuth2, OpenID Connect, user management)
-- Token validation middleware in FastAPI
-- Role claims embedded in JWT tokens
+### The stack
+- **Keycloak** as the identity provider (self-hosted or managed)
+  - Handles user registration, login, password reset, OAuth2 flows
+  - Issues JWT tokens with role claims (`realm_roles: ["user", "agent"]`)
+- **FastAPI middleware** validates the JWT on every request
+- **Role extraction** from the token determines prompt version and response content
 
-### Why it is not in MVP
-There is one user: the developer running the system locally. Authentication:
-- Adds an entire auth service to stand up
-- Requires token flows, session handling, and protected route middleware
-- Protects nothing until multiple users or sensitive data exist
+### Why it was not in MVP
+There was one user: the developer running the system locally. Authentication added complexity that protected nothing.
 
-### Signal to add it
-- The system is deployed beyond a local machine
-- Multiple users with different permissions need access
-- User-submitted property data is considered sensitive and must be protected
+### Why it is needed now
+With cloud deployment and role-specific features (Section 4), the system needs:
+- **Identity** — know who is making requests
+- **Authorization** — agents see different content than regular users
+- **Security** — the public API must not be open to anonymous traffic
+- **Rate limiting foundation** — per-user limits require knowing the user
+
+### Implementation plan
+1. Add Keycloak container to `docker-compose.yml` (dev) or use a managed instance (prod)
+2. Configure a `real-estate-ai` realm with two roles: `user` and `agent`
+3. Add `python-jose` or `PyJWT` to `requirements.txt` for token validation
+4. Create `app/middleware/auth.py` — decode JWT, extract `user_id` and `roles`, attach to request state
+5. Add `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` to `app/config.py`
+6. Protect all endpoints except `GET /health` — return 401 for missing/invalid tokens
+7. Pass `role` to the chat and prediction services so they can select the appropriate prompt version
+8. Frontend: add login flow (Keycloak JS adapter or redirect-based OAuth2)
+9. Add ADR documenting the decision
 
 ---
 
 ## 4. Agent vs. Customer Role Separation
 
+### Status: **Planned — Next Phase** (depends on Section 3: Keycloak)
+
 ### What it means
-In a real estate context, there are at least two personas:
-- **Agent:** A licensed real estate professional who uses the system to assist clients
-- **Customer/Buyer:** A consumer exploring property values independently
+Two distinct personas use the system differently:
 
-These roles have different access levels, different UI needs, and potentially different business logic (e.g., agents see model confidence, customers see only the explanation).
+**Regular User (`user` role):**
+- Describes a property, gets a price prediction and explanation
+- Same experience as the current MVP chat flow
+- No additional content beyond prediction + explanation
 
-### Why it is not in MVP
-There is one persona in MVP: a developer or tester sending a property description. Role separation requires:
-- Auth (see above)
-- UI personalization
-- Business logic branching by role
-- None of which is validated as necessary yet
+**Real Estate Agent (`agent` role):**
+- Same prediction pipeline, but the **explanation prompt** is swapped to an agent-specific version
+- The agent version includes additional sections that the regular user does not see:
+  - **Investment insight** — how the agent could profit from properties at this price point (undervalued indicators, renovation ROI potential, rental yield estimate based on price-to-neighborhood-median ratio)
+  - **Selling guide** — practical advice on positioning this property to a specific buyer profile (first-time buyer, investor, family) based on the extracted features (lot size, bedrooms, neighborhood tier)
+  - **Comparable context** — more detailed statistical comparisons (not just median, but percentile rank within the neighborhood)
+- No extra questions are asked — the same features drive both versions
+- The role is determined from the JWT token, not from user input
 
-### Signal to add it
-- Real users with real professional contexts are using the system
-- Role-specific features are requested by name
-- Auth infrastructure is already in place
+### Prompt versioning strategy
+
+The current prompt structure already supports this:
+
+```
+prompts/
+├── chat_v2.md                    ← shared (intent classification + extraction)
+├── extraction_v1.md              ← shared (standalone extraction)
+├── explanation_v1.md             ← current: regular user explanation
+├── explanation_agent_v1.md       ← NEW: agent-specific explanation
+└── explanation_agent_v1.md       ← includes investment + selling sections
+```
+
+- `chat_v2.md` and `extraction_v1.md` are **role-agnostic** — extraction is the same for everyone
+- `explanation_v1.md` stays unchanged for regular users
+- `explanation_agent_v1.md` extends the base explanation with agent-only sections
+- The service layer selects the prompt based on `role` from the request context:
+  ```python
+  prompt_file = "explanation_agent_v1.md" if role == "agent" else "explanation_v1.md"
+  ```
+
+### Implementation plan
+1. Create `prompts/explanation_agent_v1.md` — same grounding rules as `explanation_v1.md` + investment insight + selling guide sections
+2. Modify `app/services/explanation.py` to accept a `role` parameter and load the corresponding prompt
+3. Modify `app/services/chat.py` to pass the role through to the explanation stage
+4. Modify route handlers to extract role from the JWT (set by auth middleware)
+5. Frontend: display agent-specific sections with distinct styling (e.g., a "Professional Insights" card)
+6. Add integration tests for both prompt versions
+7. Update `docs/prompt-versions.md` with the agent prompt entry
+
+### Why no extra questions for agents
+The features needed for prediction are identical regardless of role. The difference is entirely in **output** — what the LLM writes in the explanation. The agent prompt simply has additional instructions that say: *"In addition to the standard explanation, provide investment and selling guidance based on the features and prediction."* The same `training_stats.json` context grounds both versions.
 
 ---
 
@@ -195,17 +264,34 @@ Each pipeline component (extraction service, prediction service, explanation ser
 
 ## Summary Table
 
-| Feature | Status | Trigger to Add |
-|---------|--------|----------------|
-| Async background tasks (Celery + Redis) | Post-MVP | >10s latency, concurrent users, batch jobs |
-| Object storage (S3/MinIO) | Post-MVP | Multi-instance deployment, model versioning |
-| Auth & RBAC (Keycloak) | Post-MVP | Real external users, sensitive data |
-| Role separation (agent/customer) | Post-MVP | Auth in place, role-specific features requested |
+| Feature | Status | Trigger / Rationale |
+|---------|--------|---------------------|
+| Async background tasks (Celery + Redis) | Post-MVP | Not needed — SSE streaming is real-time, FastAPI async handles concurrency |
+| Object storage (GCS) | **Planned — Next Phase** | Model versioning, decouple deployment from artifact, shared storage across Cloud Run instances |
+| Auth & RBAC (Keycloak) | **Planned — Next Phase** | Public API security, role-based prompt selection, rate limiting foundation |
+| Role separation (agent/customer) | **Planned — Next Phase** | Agent-specific explanation prompts (investment insight + selling guide) |
 | Messaging / event bus | Post-MVP | Fan-out, independent scaling, reliability SLAs |
 | LLM fine-tuning | Post-MVP | >10% prompt extraction error rate, labeled data |
 | Continuous retraining | Post-MVP | Live data pipeline, measurable concept drift |
 | Experiment tracking (MLflow) | Post-MVP | >3 model variants, team collaboration |
 | Microservice architecture | Post-MVP | Independent scaling, separate team ownership |
+
+---
+
+---
+
+## 10. Cloud Deployment (Google Cloud Run + Vercel)
+
+### Status: Decided (ADR-011, supersedes ADR-010)
+
+This item has been promoted from future consideration to an active decision:
+
+- **API:** Google Cloud Run — Docker container with `ENVIRONMENT=production` (Groq LLM), auto-scales to zero, free tier
+- **Frontend:** Vercel — static React app with `VITE_API_URL` pointing to the Cloud Run service URL
+- **Guide:** `docs/deployment/cloud-run-guide.md`
+- **Previous:** AWS guide preserved at `docs/deployment/aws-guide.md` for reference (ADR-010, superseded)
+
+This is no longer a future consideration — it is the deployment architecture.
 
 ---
 

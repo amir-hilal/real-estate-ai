@@ -35,6 +35,68 @@
 
 ---
 
+### 2026-04-15 — Switched from AWS to Google Cloud Run
+
+- **Reason:** AWS account not accessible; Cloud Run offers a generous free tier ($0/month for demo), auto-scales to zero, and deploys Docker containers with ~5 commands.
+- Created `docs/deployment/cloud-run-guide.md` — full step-by-step Cloud Run deployment guide.
+- Added ADR-011 (Google Cloud Run + Vercel) — supersedes ADR-010 (AWS + Vercel).
+- Updated assumption A-22 from AWS to Cloud Run.
+- Updated `docs/context/future-considerations.md` Section 10 to reference Cloud Run.
+- AWS guide preserved at `docs/deployment/aws-guide.md` for reference.
+
+---
+
+### 2026-04-15 — Celery/Redis Removed from Plan + Future Considerations Revised
+
+**Phase:** Post-MVP — Architecture Review  
+**Duration:** ~30 min  
+**Status change:** Deployment planned → Deployment planned (scope narrowed)
+
+**What was done:**
+- Removed Celery + Redis from "Planned — Next Phase" after analysis showed it doesn't fit the architecture
+- Key insight: all user-facing interactions use SSE streaming (`POST /chat`), which requires an open HTTP connection — incompatible with fire-and-forget task dispatch. FastAPI's async event loop already handles concurrent I/O-bound LLM calls.
+- Section 1 of `future-considerations.md` reverted to Post-MVP with documented rationale for rejection
+- Updated `current-status.md` to reflect 3 planned items (S3, Keycloak, role separation) instead of 4
+- Remaining planned items: S3 (model storage/versioning), Keycloak (auth + RBAC), agent/customer role separation
+
+**Decisions made:**
+- Celery + Redis is not needed — SSE streaming is real-time, and async Python handles the I/O concurrency that matters. The complexity cost (2 extra services, broker config, polling endpoints) is not justified.
+
+**Next session should start with:**
+- Deploy API to AWS, then implement S3 / Keycloak / role separation
+
+**Blockers:**
+- None
+
+---
+
+### 2026-04-15 — Deployment Architecture Decided + AWS Guide Created
+
+**Phase:** Post-MVP — Deployment  
+**Duration:** ~1 hour  
+**Status change:** MVP complete → Deployment planned
+
+**What was done:**
+- Created AWS deployment guide at `docs/deployment/aws-guide.md` covering ECS Fargate and EC2 options
+- Added ADR-010 — AWS (API) + Vercel (Frontend) deployment architecture
+- Updated assumptions: A-16 through A-19 marked CONFIRMED; A-20, A-21 marked SUPERSEDED (chat UI replaced form UI)
+- Added new assumptions: A-22 (AWS hosting), A-23 (Vercel hosting), A-24 (no Ollama in production)
+- Updated `future-considerations.md` with Section 10 (cloud deployment — decided)
+- Updated `current-status.md` next actions to include deployment steps
+
+**Decisions made:**
+- AWS for API hosting (ECS Fargate preferred, EC2 as cheaper alternative) — ADR-010
+- Vercel for frontend hosting — ADR-010
+- `ENVIRONMENT=production` with Groq LLM in cloud (no Ollama) — A-24
+
+**Next session should start with:**
+- Deploy the API to AWS following the guide
+- Deploy the frontend to Vercel
+- Review `docs/context/future-considerations.md` for post-MVP enhancements
+
+**Blockers:**
+- None
+
 ---
 
 ### 2026-04-15 — MVP Complete — All 7 Phases Done

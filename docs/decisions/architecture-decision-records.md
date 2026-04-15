@@ -328,3 +328,85 @@ Extract the frontend to a standalone React application built with Vite + React 1
 - `GET /` no longer serves the UI from the FastAPI backend — the API root returns the health endpoint or OpenAPI docs
 - The frontend is a separate codebase with its own `package.json`, `tsconfig.json`, and `vite.config.ts`
 - No npm or Node.js dependencies are added to the Python backend project
+
+---
+
+## ADR-010 — AWS (API) + Vercel (Frontend) Deployment Architecture
+
+**Date:** 2026-04-15  
+**Status:** Superseded by ADR-011  
+**Decided by:** Project lead
+
+#### Context
+With MVP complete (all 7 phases), the system needs to be deployed beyond `localhost`. The architecture has two independently deployable components:
+
+1. **FastAPI API server** — a Docker container running the ML model, LLM pipeline, and API endpoints
+2. **React frontend** — a static single-page application that communicates with the API via SSE
+
+These components have fundamentally different hosting requirements. The API needs a container runtime, persistent memory for the ML model (~50MB), and outbound HTTPS access to the Groq LLM API. The frontend is static HTML/JS/CSS that needs only a CDN.
+
+**Options considered for the API:**
+1. **AWS ECS Fargate** — serverless containers; no EC2 management; pay-per-use; built-in load balancer integration. Higher per-hour cost than EC2 but zero server maintenance.
+2. **AWS EC2** — full control; cheapest for sustained workloads; requires manual Docker installation and management.
+3. **AWS App Runner** — simplest AWS container hosting; auto-scales from zero; limited configuration options.
+4. **Railway / Fly.io** — simpler than AWS; Docker-native; lower learning curve but less control and smaller ecosystem.
+
+**Options considered for the frontend:**
+1. **Vercel** — purpose-built for React/Next.js; automatic Git deployments; free tier; global CDN.
+2. **AWS S3 + CloudFront** — more control; same cloud as API; more configuration overhead.
+3. **Netlify** — similar to Vercel; slightly less optimized for React.
+
+#### Decision
+- **API:** AWS — deploy the Docker container using ECS Fargate (preferred) or EC2. `ENVIRONMENT=production` activates Groq LLM provider. CORS origin set to the Vercel domain.
+- **Frontend:** Vercel — deploy the React app with automatic Git-based deployments. `VITE_API_URL` environment variable points to the AWS API endpoint.
+
+#### Consequences
+- The API and frontend are deployed on separate platforms — they communicate only via HTTPS + SSE
+- `CORS_ORIGIN` in the API must be updated from `http://localhost:5173` to the Vercel production URL
+- `GROQ_API_KEY` must be configured as an environment variable in the AWS deployment (ECS task definition or EC2 environment)
+- No Ollama in production — the Groq hosted LLM is the only option without provisioning a GPU instance
+- The API needs a public HTTPS endpoint (via ALB or direct) for the frontend to reach it
+- Deployment cost is minimal: Vercel free tier for frontend + AWS Fargate or small EC2 for API
+
+---
+
+## ADR-011 — Google Cloud Run (API) + Vercel (Frontend) Deployment Architecture
+
+**Date:** 2026-04-15  
+**Status:** Accepted  
+**Decided by:** Project lead  
+**Supersedes:** ADR-010
+
+#### Context
+ADR-010 selected AWS (ECS Fargate or EC2) for the API deployment. However, the AWS account is not accessible. An alternative cloud platform is needed that:
+
+1. Runs Docker containers natively (no application changes)
+2. Has a meaningful free tier for a demo/portfolio project
+3. Provides HTTPS endpoints out of the box (required for SSE from Vercel frontend)
+4. Supports SSE streaming without special configuration
+
+**Options considered:**
+1. **Google Cloud Run** — serverless containers; auto-scales to zero; free tier (2M requests/month, 360K GB-seconds); HTTPS by default; runs Dockerfile as-is; ~5 commands to deploy.
+2. **AWS App Runner** — similar to Cloud Run but requires AWS access (blocked).
+3. **Railway** — Docker-native; simple deployment; free tier limited to $5 credit.
+4. **Fly.io** — Docker-native; global edge deployment; free tier includes 3 shared VMs.
+
+#### Decision
+- **API:** Google Cloud Run — deploy the existing Docker container. `ENVIRONMENT=production` activates Groq LLM provider. `PORT=8080` (Cloud Run default). CORS origin set to the Vercel domain.
+- **Frontend:** Vercel — unchanged from ADR-010. `VITE_API_URL` points to the Cloud Run service URL.
+
+#### Why Cloud Run over alternatives
+- Most generous free tier (2M requests/month vs. $5 credit on Railway)
+- Auto-scales to zero — truly $0 when not in use
+- HTTPS with no configuration (no ALB, no certificates, no domain setup)
+- SSE streaming works natively (unlike some serverless platforms that buffer responses)
+- Deployment is ~5 commands vs. many steps for AWS ECS
+
+#### Consequences
+- The API and frontend remain on separate platforms (same as ADR-010)
+- `CORS_ORIGIN` must be set to the Vercel production URL
+- `GROQ_API_KEY` must be configured as a Cloud Run environment variable (or via Secret Manager)
+- Cold starts when scaled to zero (~15-20s) — acceptable for a demo project
+- Cloud Run injects `PORT=8080` — the app must listen on this port
+- The AWS guide (`docs/deployment/aws-guide.md`) is preserved for reference
+- Deployment guide: `docs/deployment/cloud-run-guide.md`

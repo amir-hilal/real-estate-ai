@@ -88,7 +88,9 @@ Status: **Complete** ✓
 
 ## Post-MVP / Future Work
 
-See `docs/context/future-considerations.md` for planned enhancements.
+- **Deployment:** Google Cloud Run (API) + Vercel (frontend) — see ADR-011, `docs/deployment/cloud-run-guide.md`
+- **Planned — Next Phase:** GCS (model storage/versioning), Keycloak (auth + RBAC), agent/customer role separation with role-specific explanation prompts
+- See `docs/context/future-considerations.md` for full details and remaining Post-MVP items.
 
 ---
 
@@ -100,8 +102,9 @@ See `docs/context/future-considerations.md` for planned enhancements.
 
 ## Next Actions (in order)
 
-1. **Review `docs/context/future-considerations.md`** — prioritize post-MVP enhancements
-2. **Choose first post-MVP feature** to implement
+1. **Deploy API to Google Cloud Run** — follow `docs/deployment/cloud-run-guide.md`
+2. **Deploy frontend to Vercel** — set `VITE_API_URL` to the Cloud Run service URL
+3. **Review `docs/context/future-considerations.md`** — prioritize post-MVP enhancements
 
 ---
 
