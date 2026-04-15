@@ -11,6 +11,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Configure root logger so application-level logger.info() calls are visible
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
 from fastapi.responses import JSONResponse
 
 from app.config import settings

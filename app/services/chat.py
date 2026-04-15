@@ -12,6 +12,7 @@ Handles one conversational turn:
        yield done event
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -161,7 +162,11 @@ async def run_chat_turn(
 
     # 2. Build message list for the LLM (history + new user message)
     llm_messages = [{"role": m.role, "content": m.content} for m in history]
-    llm_messages.append({"role": "user", "content": message})
+    # Deduplicate: if the client already appended the current message to history, skip it
+    if llm_messages and llm_messages[-1]["role"] == "user" and llm_messages[-1]["content"] == message:
+        logger.debug("Skipping duplicate user message already present in history")
+    else:
+        llm_messages.append({"role": "user", "content": message})
 
     # 3. Call LLM (non-streaming) for intent + extraction — pass full history
     try:
@@ -208,11 +213,20 @@ async def run_chat_turn(
     reply: str = parsed["reply"]
     extracted: dict | None = parsed.get("extracted_features")
 
+
     # 5. Merge extracted features into accumulated
     merged_features = _merge_features(accumulated_features, extracted)
 
     # 6. Check which required fields are still missing
     missing_required = [f for f in _REQUIRED_FIELDS if merged_features.get(f) is None]
+
+    logger.info(
+        "Chat turn — intent=%s, missing_required=%s, extracted_keys=%s, accumulated_keys=%s",
+        intent,
+        missing_required or "none",
+        [k for k, v in (extracted or {}).items() if v is not None],
+        list(accumulated_features.keys()),
+    )
 
     # 7. Emit extracted features (metadata only — no display text)
     non_null_features = {k: v for k, v in merged_features.items() if v is not None}
@@ -254,6 +268,11 @@ async def run_chat_turn(
         "prediction_usd": round(price),
         "features": features.model_dump(),
     })
+
+    # Brief yield to let the event loop flush the prediction event
+    # before explanation tokens start — helps frontend process prediction
+    # as a separate chunk from explanation tokens
+    await asyncio.sleep(0)
 
     # 10. Stream explanation
     explanation_prompt = build_explanation_prompt(
