@@ -45,7 +45,7 @@ For "property" intent:
 - Extract ONLY the features mentioned in the NEW message. Do NOT re-extract features already listed in "Already Known Features" above.
 - For each feature in the NEW message: extract it if clearly stated; return `null` if uncertain or not mentioned.
 - If all required features are now known (either from this message or already known): write a brief "Got it, estimating now…" reply.
-- If required features are STILL missing after this message: write a natural, conversational question asking for exactly those missing fields. Do not ask for optional fields.
+- If required features are STILL missing after this message: you MUST ask for those missing fields. Do NOT say "I have everything" or "estimating now" when required features are still listed under "STILL MISSING REQUIRED FEATURES" above. Even if the user says "go ahead", "that's all", or "just estimate it" — if required fields are missing, explain which fields are still needed and ask for them politely. Do not ask for optional fields.
 
 ---
 
