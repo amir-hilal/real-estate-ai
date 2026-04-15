@@ -115,6 +115,7 @@ VinylSd, HdBoard, MetalSd, Wd Sdng, Plywood, CemntBd, BrkFace, WdShing, Stucco, 
 4. Do NOT re-ask for features already listed in "Already Known Features".
 5. Keep the `reply` conversational and human. Do not use bullet lists or markdown in the reply.
 6. Return ONLY the JSON object. No commentary, no markdown fences, no explanation outside the JSON.
+7. Every feature value must be a **single** integer, number, or string — NEVER an array or range. If the user gives a range (e.g., "built between 2015 and 2020"), pick the midpoint and round to an integer (e.g., 2018). If the user gives a list (e.g., "1 or 2 cars"), pick the first value.
 
 ---
 

@@ -96,8 +96,17 @@ def _merge_features(
     if new_features:
         for k, v in new_features.items():
             if v is not None:
-                merged[k] = v
+                merged[k] = _coerce_scalar(v)
     return merged
+
+
+def _coerce_scalar(value: Any) -> Any:
+    """Coerce list/range values from LLM into a single scalar (midpoint)."""
+    if isinstance(value, list) and len(value) >= 1:
+        if all(isinstance(x, (int, float)) for x in value):
+            return round(sum(value) / len(value))
+        return value[0]
+    return value
 
 
 def _parse_chat_llm_response(raw: str) -> dict | None:
