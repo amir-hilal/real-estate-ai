@@ -45,7 +45,9 @@ User message
     ▼
 [LLM: intent classification + feature extraction]
     │
-    ├─ intent = "chat"      → stream conversational reply → done
+    ├─ emit features event (extracted_features metadata)
+    │
+    ├─ intent = "chat"      → stream reply as word-level tokens → done
     │
     └─ intent = "property"
             │
@@ -53,9 +55,10 @@ User message
         merge extracted_features with accumulated_features (client-side state)
             │
             ├─ required fields still missing
-            │       └─ stream ask-for-missing reply → done
+            │       └─ stream ask-for-missing reply as tokens → done
             │
             └─ all required fields present
+                    ├─ stream reply as tokens
                     ├─ emit prediction event  (ML inference, ~instant)
                     └─ stream explanation tokens (Stage 3 LLM)
 ```
@@ -97,21 +100,22 @@ User message
 
 | Event | Payload | When emitted |
 |-------|---------|-------------|
-| `reply` | `{"text": "..."}` | Conversational reply or ask-for-fields reply (not streamed per-token — single event) |
-| `prediction` | `{"prediction_usd": 183400, "features": {...}}` | Immediately when ML inference completes |
-| `token` | `{"text": "..."}` | Each explanation chunk from Stage 3 LLM |
+| `features` | `{"extracted_features": {...}}` | Feature metadata extracted from this turn (emitted once, before any tokens) |
+| `token` | `{"text": "..."}` | Each word/chunk of the reply AND explanation (all text is streamed) |
+| `prediction` | `{"prediction_usd": 183400, "features": {...}}` | Immediately when ML inference completes (between reply tokens and explanation tokens) |
 | `done` | `{}` | End of stream |
 | `error` | `{"code": "...", "message": "..."}` | Any failure |
 
-**Why `reply` is not token-streamed:** Short conversational replies (1-3 sentences) feel jarring as partial tokens. The explanation is the meaningful streaming experience — it is long and benefits from progressive rendering.
+**Why all text is token-streamed:** The reply text is split into word-level token events on the backend (via `_stream_text_as_tokens`). This gives the frontend a single streaming model — all visible text arrives as `token` events, whether it is a greeting, a follow-up question, or an explanation. The `features` event carries only metadata (no display text) and is emitted before the first token.
 
 ### 2. `app/services/chat.py` — Chat orchestration service
 
 Responsibilities:
 1. Call LLM with the chat prompt (non-streaming) to get `{intent, reply, extracted_features}`
 2. Validate and merge `extracted_features` with `accumulated_features`
-3. If `intent == "chat"` or missing fields remain → emit `reply` event → emit `done`
-4. If all required fields present → run `predict_price()` → emit `prediction` event → call explanation LLM with streaming → forward each token as `token` event → emit `done`
+3. Emit `features` event with the current merged feature set
+4. If `intent == "chat"` or missing fields remain → stream reply as word-level `token` events → emit `done`
+5. If all required fields present → stream reply as tokens → run `predict_price()` → emit `prediction` event → call explanation LLM with streaming → forward each chunk as `token` event → emit `done`
 
 The service must accept the LLM client as a parameter (testability requirement per LLM instructions).
 
@@ -172,7 +176,7 @@ The Babel Standalone CDN approach could not deliver reliable token-by-token stre
 2. Maintain client-side state: `messages[]`, `accumulatedFeatures{}`, `streaming`, `streamingText`
 3. Send `POST /chat` with `{message, history, accumulated_features}` on each turn
 4. Parse the SSE response stream using `fetch()` + `ReadableStream` + `TextDecoder`
-5. Dispatch events: `reply` → set reply text, `prediction` → render prediction card, `token` → append to streaming text with browser yield, `done` → commit message, `error` → show error bubble
+5. Dispatch events: `features` → merge into accumulated features, `prediction` → render prediction card, `token` → append to streaming text with browser yield, `done` → commit message, `error` → show error bubble
 6. Yield to browser between token events (`requestAnimationFrame`) to guarantee per-token rendering
 7. Render prediction card inline in the chat thread (collapsible feature details)
 8. Character counter at 1800+, hard limit 2000
@@ -267,4 +271,4 @@ Phase 6 is complete only when ALL of the following are true:
 | `app/main.py` | Update | Register `chat_router`, add CORS middleware, remove `ui_router` |
 | `app/routes/ui.py` | Delete | No longer serves static files |
 | `app/static/` | Delete | Frontend is a standalone app |
-| *Standalone React app* | Create | Separate directory, Vite + React 18 + TS + Tailwind |
+| *Standalone React app* | Create | Separate directory, Vite + React 18 + TS + plain CSS |

@@ -23,13 +23,13 @@ $(VENV)/bin/activate:
 	python3 -m venv $(VENV)
 
 # ---------------------------------------------------------------------------
-# Run services
+# Run API server
 # ---------------------------------------------------------------------------
 
-serve: ## Start the API + UI (dev mode with auto-reload) — open http://localhost:8000
+serve: ## Start the API server (dev mode with auto-reload)
 	$(UVICORN) app.main:app --host 0.0.0.0 --port 8000 --reload
 
-serve-prod: ## Start the API + UI (production mode)
+serve-prod: ## Start the API server (production mode)
 	ENVIRONMENT=production $(UVICORN) app.main:app --host 0.0.0.0 --port 8000
 
 # ---------------------------------------------------------------------------

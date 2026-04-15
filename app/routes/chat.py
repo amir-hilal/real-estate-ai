@@ -2,7 +2,7 @@
 POST /chat — Conversational chat endpoint with SSE streaming.
 
 Accepts a user message, conversation history, and accumulated features.
-Streams SSE events: reply, prediction, token, done, error.
+Streams SSE events: features, token, prediction, done, error.
 
 The endpoint is stateless — all session state is managed by the client.
 """
@@ -31,9 +31,9 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
     Response content-type: text/event-stream
 
     Events:
-      reply      — {"text": "...", "extracted_features": {...}}
+      features   — {"extracted_features": {...}}  (metadata only)
+      token      — {"text": "<chunk>"}   (reply AND explanation chunks)
       prediction — {"prediction_usd": 183400, "features": {...}}
-      token      — {"text": "<chunk>"}   (explanation chunks)
       done       — {}
       error      — {"code": "...", "message": "..."}
     """

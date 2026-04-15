@@ -128,6 +128,14 @@ def _sse_event(event_type: str, payload: dict) -> str:
     return f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
 
 
+async def _stream_text_as_tokens(text: str) -> AsyncIterator[str]:
+    """Yield a text string as word-level token SSE events."""
+    words = text.split(" ")
+    for i, word in enumerate(words):
+        chunk = word if i == 0 else " " + word
+        yield _sse_event("token", {"text": chunk})
+
+
 async def run_chat_turn(
     client: AsyncOpenAI,
     message: str,
@@ -206,18 +214,21 @@ async def run_chat_turn(
     # 6. Check which required fields are still missing
     missing_required = [f for f in _REQUIRED_FIELDS if merged_features.get(f) is None]
 
-    # 7. Route based on intent and completeness
+    # 7. Emit extracted features (metadata only — no display text)
+    non_null_features = {k: v for k, v in merged_features.items() if v is not None}
+    yield _sse_event("features", {"extracted_features": non_null_features})
+
+    # 8. Route based on intent and completeness
     if intent == "chat" or missing_required:
-        # Emit the conversational reply and stop
-        yield _sse_event("reply", {
-            "text": reply,
-            "extracted_features": {k: v for k, v in merged_features.items() if v is not None},
-        })
+        # Stream the conversational reply as word-level tokens
+        async for event in _stream_text_as_tokens(reply):
+            yield event
         yield _sse_event("done", {})
         return
 
-    # 8. All required features present — run prediction
-    yield _sse_event("reply", {"text": reply, "extracted_features": merged_features})
+    # 9. All required features present — stream reply, then predict
+    async for event in _stream_text_as_tokens(reply):
+        yield event
 
     try:
         features = PropertyFeatures(**merged_features)
@@ -244,7 +255,7 @@ async def run_chat_turn(
         "features": features.model_dump(),
     })
 
-    # 9. Stream explanation
+    # 10. Stream explanation
     explanation_prompt = build_explanation_prompt(
         template=explanation_prompt_template,
         features=features,
