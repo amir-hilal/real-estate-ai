@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Prompt versioning
     extraction_prompt_version: str = "v1"
     explanation_prompt_version: str = "v1"
-    chat_prompt_version: str = "v2"
+    chat_prompt_version: str = "v3"
 
     # ML model artifact
     model_path: Path = Path("ml/artifacts/model.joblib")
