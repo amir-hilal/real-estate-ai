@@ -13,11 +13,11 @@ from app.config import resolve_prompt_version, settings
 
 router = APIRouter()
 
-# Version descriptions (what changed in each)
+# Version descriptions (shown in the frontend version selector dropdown)
 _VERSION_NOTES: dict[str, str] = {
-    "v1": "Initial prompts",
-    "v2": "Stronger missing-field enforcement, no optional questions while required fields missing",
-    "v3": "Neighborhood full names in replies and explanations (never codes)",
+    "v1": "Original — the classic conversation style",
+    "v2": "Improved — asks for the most important details first",
+    "v3": "Recommended — uses full neighborhood names throughout",
 }
 
 
