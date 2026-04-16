@@ -67,5 +67,12 @@
     "MasVnrArea",
     "Exterior1st",
     "FullBath"
-  ]
+  ],
+  "model_performance": {
+    "test_mae": 17936,
+    "test_rmse": 29238,
+    "test_r2": 0.8885,
+    "baseline_mae": 59568,
+    "improvement_pct": 69.9
+  }
 }

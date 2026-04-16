@@ -54,10 +54,12 @@ app.add_middleware(
 from app.routes.extract import router as extract_router
 from app.routes.predict import router as predict_router
 from app.routes.chat import router as chat_router
+from app.routes.insights import router as insights_router
 
 app.include_router(chat_router)
 app.include_router(extract_router)
 app.include_router(predict_router)
+app.include_router(insights_router)
 
 
 @app.get("/health")
