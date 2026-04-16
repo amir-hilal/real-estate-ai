@@ -19,3 +19,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list, max_length=50)
     accumulated_features: dict[str, Any] = Field(default_factory=dict)
+    prompt_version: str | None = Field(
+        default=None,
+        description="Chat prompt version to use (e.g. 'v1', 'v2', 'v3'). Defaults to server config.",
+    )

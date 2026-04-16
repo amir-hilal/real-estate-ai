@@ -1,7 +1,8 @@
 """
 POST /chat — Conversational chat endpoint with SSE streaming.
 
-Accepts a user message, conversation history, and accumulated features.
+Accepts a user message, conversation history, accumulated features,
+and an optional prompt_version to select which chat prompt to use.
 Streams SSE events: features, token, prediction, done, error.
 
 The endpoint is stateless — all session state is managed by the client.
@@ -21,6 +22,17 @@ from app.services.explanation import load_explanation_prompt
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _get_chat_prompt(app_state, version: str) -> str:
+    """Load a chat prompt by version, caching on app.state.chat_prompts dict."""
+    if not hasattr(app_state, "chat_prompts"):
+        app_state.chat_prompts = {}
+    if version not in app_state.chat_prompts:
+        app_state.chat_prompts[version] = load_chat_prompt(
+            settings.prompts_dir, version
+        )
+    return app_state.chat_prompts[version]
 
 
 @router.post("/chat", include_in_schema=True)
@@ -47,18 +59,31 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
             },
         )
 
+    # Resolve prompt version: client override or server default
+    version = body.prompt_version or settings.chat_prompt_version
+
     logger.info(
-        "POST /chat message_len=%d history_turns=%d accumulated_keys=%s",
+        "POST /chat message_len=%d history_turns=%d accumulated_keys=%s prompt_version=%s",
         len(body.message),
         len(body.history),
         list(body.accumulated_features.keys()),
+        version,
     )
 
-    # Load prompts once per app lifetime (cache on app.state)
-    if not hasattr(request.app.state, "chat_prompt"):
-        request.app.state.chat_prompt = load_chat_prompt(
-            settings.prompts_dir, settings.chat_prompt_version
+    # Load chat prompt (cached per version)
+    try:
+        chat_prompt = _get_chat_prompt(request.app.state, version)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "status": "error",
+                "error_code": "INVALID_PROMPT_VERSION",
+                "message": f"Chat prompt version '{version}' not found.",
+            },
         )
+
+    # Load explanation prompt once (not versioned yet)
     if not hasattr(request.app.state, "explanation_prompt"):
         request.app.state.explanation_prompt = load_explanation_prompt(
             settings.prompts_dir, settings.explanation_prompt_version
@@ -74,7 +99,7 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
             accumulated_features=body.accumulated_features,
             pipeline=request.app.state.pipeline,
             training_stats=request.app.state.training_stats,
-            chat_prompt_template=request.app.state.chat_prompt,
+            chat_prompt_template=chat_prompt,
             explanation_prompt_template=request.app.state.explanation_prompt,
         ):
             yield event
