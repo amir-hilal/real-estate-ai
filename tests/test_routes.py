@@ -65,8 +65,8 @@ def mock_app_state():
     app.state.pipeline = fake_pipeline
     app.state.training_stats = fake_stats
     # Pre-load prompts from disk so route doesn't hit the filesystem per-request
-    app.state.extraction_prompt = Path("prompts/extraction_v1.md").read_text()
-    app.state.explanation_prompt = Path("prompts/explanation_v1.md").read_text()
+    app.state.extraction_prompt = Path("prompts/v1/extraction.md").read_text()
+    app.state.explanation_prompt = Path("prompts/v1/explanation.md").read_text()
     yield
     # Cleanup
     del app.state.pipeline

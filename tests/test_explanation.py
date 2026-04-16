@@ -62,9 +62,9 @@ ALL_FEATURES = PropertyFeatures(
 
 @pytest.fixture
 def explanation_template():
-    """Load the real explanation_v1.md prompt from disk."""
+    """Load the real explanation v1 prompt from disk."""
     from pathlib import Path
-    return Path("prompts/explanation_v1.md").read_text(encoding="utf-8")
+    return Path("prompts/v1/explanation.md").read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -74,13 +74,15 @@ def explanation_template():
 class TestLoadExplanationPrompt:
 
     def test_loads_existing_prompt(self, tmp_path):
-        prompt_file = tmp_path / "explanation_v1.md"
+        v1_dir = tmp_path / "v1"
+        v1_dir.mkdir()
+        prompt_file = v1_dir / "explanation.md"
         prompt_file.write_text("You are an expert.", encoding="utf-8")
         result = load_explanation_prompt(tmp_path, "v1")
         assert result == "You are an expert."
 
     def test_raises_on_missing_file(self, tmp_path):
-        with pytest.raises(FileNotFoundError, match="explanation_v99.md"):
+        with pytest.raises(FileNotFoundError, match="explanation.md"):
             load_explanation_prompt(tmp_path, "v99")
 
 

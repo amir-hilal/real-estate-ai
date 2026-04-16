@@ -26,13 +26,15 @@ from tests.conftest import make_extraction_json, make_llm_response
 class TestLoadExtractionPrompt:
 
     def test_loads_existing_prompt(self, tmp_path):
-        prompt_file = tmp_path / "extraction_v1.md"
+        v1_dir = tmp_path / "v1"
+        v1_dir.mkdir()
+        prompt_file = v1_dir / "extraction.md"
         prompt_file.write_text("You are an assistant.", encoding="utf-8")
         result = load_extraction_prompt(tmp_path, "v1")
         assert result == "You are an assistant."
 
     def test_raises_on_missing_file(self, tmp_path):
-        with pytest.raises(FileNotFoundError, match="extraction_v99.md"):
+        with pytest.raises(FileNotFoundError, match="extraction.md"):
             load_extraction_prompt(tmp_path, "v99")
 
 

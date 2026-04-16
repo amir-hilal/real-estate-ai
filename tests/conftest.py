@@ -27,8 +27,8 @@ def make_llm_response(content: str):
 
 @pytest.fixture
 def extraction_prompt():
-    """Load the real extraction_v1.md prompt from disk."""
-    path = Path("prompts/extraction_v1.md")
+    """Load the real extraction v1 prompt from disk."""
+    path = Path("prompts/v1/extraction.md")
     return path.read_text(encoding="utf-8")
 
 
