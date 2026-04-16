@@ -54,13 +54,14 @@ TRAINING_STATS_PATH=ml/artifacts/training_stats.json
 
 # Server
 HOST=0.0.0.0
-PORT=8080
+# PORT is NOT set here — Cloud Run injects PORT=8080 automatically.
+# The Dockerfile CMD reads $PORT, so this works without configuration.
 
-# CORS — set to your Vercel domain
+# CORS — set to your Vercel domain (no trailing slash)
 CORS_ORIGIN=https://your-app.vercel.app
 ```
 
-**Note:** Cloud Run expects `PORT=8080` by default. The container must listen on this port.
+**Important:** Do NOT set `PORT` in `--set-env-vars` — Cloud Run reserves it and will reject the deployment. Cloud Run injects `PORT=8080` automatically, and the Dockerfile CMD (`uvicorn ... --port $PORT`) picks it up.
 
 **Security:** For `GROQ_API_KEY`, you can use `--set-secrets` with Google Secret Manager instead of `--set-env-vars` for better security. For a demo project, env vars are acceptable.
 
@@ -68,21 +69,36 @@ CORS_ORIGIN=https://your-app.vercel.app
 
 ## Step 1 — Install and Configure gcloud CLI
 
-```bash
-# Install (if not already)
-# See: https://cloud.google.com/sdk/docs/install
+**On WSL (Ubuntu/Debian):** Use snap — the apt repo method can hang in WSL:
 
-# Login
+```bash
+sudo snap install google-cloud-cli --classic
+gcloud version  # verify installation
+```
+
+**On native Linux (non-WSL):** Use the apt method:
+
+```bash
+# See: https://cloud.google.com/sdk/docs/install
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+sudo apt-get update && sudo apt-get install -y google-cloud-cli
+```
+
+Then login and set up the project:
+
+```bash
 gcloud auth login
 
 # Create a project (or use an existing one)
 gcloud projects create real-estate-ai-demo --name="Real Estate AI"
 gcloud config set project real-estate-ai-demo
 
-# Enable required APIs
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
+# Enable required APIs (requires billing — see note below)
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com
 ```
+
+> **Billing required:** Google requires a billing account to enable APIs, even for free-tier usage. Link one at https://console.cloud.google.com/billing/linkedaccount?project=real-estate-ai-demo
 
 ---
 
@@ -155,13 +171,14 @@ CHAT_PROMPT_VERSION=v2,\
 MODEL_PATH=ml/artifacts/model.joblib,\
 TRAINING_STATS_PATH=ml/artifacts/training_stats.json,\
 HOST=0.0.0.0,\
-PORT=8080,\
 CORS_ORIGIN=https://your-app.vercel.app"
 ```
 
+> **Do NOT include `PORT`** in `--set-env-vars` — Cloud Run reserves it and will reject the deployment. The `--port 8080` flag tells Cloud Run which port to route to, and Cloud Run injects `PORT=8080` into the container environment automatically.
+
 **Key flags:**
-- `--allow-unauthenticated` — public API (auth handled by Keycloak later, not Cloud Run IAM)
-- `--port 8080` — Cloud Run default; update your `PORT` env var to match
+- `--allow-unauthenticated` — public API (no auth in MVP)
+- `--port 8080` — Cloud Run injects `PORT=8080` automatically; the Dockerfile CMD reads `$PORT`
 - `--memory 1Gi` — enough for the ML model (~50MB) + Python runtime
 - `--timeout 300` — 5 minutes max per request (SSE streams need time)
 
@@ -233,12 +250,53 @@ gcloud run deploy real-estate-ai \
 
 ## PORT Configuration
 
-Cloud Run injects `PORT=8080` by default. Your FastAPI app reads `PORT` from environment variables via `app/config.py`. You have two options:
+Cloud Run injects `PORT=8080` as a reserved environment variable — you **cannot** set it via `--set-env-vars` (the deployment will fail with `reserved env names` error).
 
-1. **Set `PORT=8080` explicitly** in the Cloud Run env vars (recommended — already done in Step 4)
-2. **Let Cloud Run inject it** — remove `PORT` from `--set-env-vars` and ensure your app reads the `PORT` env var
+This works automatically because:
+1. Cloud Run injects `PORT=8080` into the container
+2. The Dockerfile CMD runs `uvicorn app.main:app --host $HOST --port $PORT`
+3. Uvicorn reads the injected value and listens on 8080
 
-Either way, the app will listen on 8080 and Cloud Run will route HTTPS traffic to it.
+For **local development**, the Dockerfile defaults to `PORT=8000` (set in the `ENV` directive), and `app/config.py` defaults to port 8000. No changes needed.
+
+---
+
+## Google Workspace / Organization Policy
+
+If your Google account belongs to a Google Workspace organization (e.g., a custom domain like `@yourcompany.com`), the `--allow-unauthenticated` flag may fail with:
+
+```
+FAILED_PRECONDITION: One or more users named in the policy do not belong to a permitted customer
+```
+
+This is caused by the `iam.allowedPolicyMemberDomains` organization policy blocking `allUsers` access. To fix it:
+
+```bash
+# 1. Find your organization ID
+gcloud organizations list
+
+# 2. Enable the org policy API (if not already)
+gcloud services enable orgpolicy.googleapis.com
+
+# 3. Override the policy at the project level to allow public access
+cat <<EOF > /tmp/policy.yaml
+name: projects/real-estate-ai-demo/policies/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+  - allowAll: true
+EOF
+
+gcloud org-policies set-policy /tmp/policy.yaml
+
+# 4. Now set the IAM binding for public access
+gcloud beta run services add-iam-policy-binding \
+  --region=us-central1 \
+  --member=allUsers \
+  --role=roles/run.invoker \
+  real-estate-ai
+```
+
+This override applies only to the `real-estate-ai-demo` project — it does not affect other projects in the organization.
 
 ---
 
@@ -283,4 +341,7 @@ To minimize cold starts:
 | SSE stream cuts off mid-response | Increase `--timeout` (default 300s should be sufficient). Check Cloud Run logs for timeout errors. |
 | Cold start too slow | The ML model loads at startup. Ensure the Docker image is as small as possible. Consider `--min-instances 1` if cold starts are unacceptable. |
 | `docker build` fails on ARM Mac (M1/M2) | Add `--platform linux/amd64` to the build command. |
-| Port mismatch | Cloud Run expects port 8080 by default. Ensure `PORT=8080` in env vars or use `--port` flag matching your app's configured port. |
+| Port mismatch | Cloud Run expects port 8080 by default. Do NOT set `PORT` in env vars (it's reserved). Use `--port 8080` flag — the Dockerfile CMD reads the injected `$PORT` automatically. |
+| `reserved env names: PORT` error on deploy | Remove `PORT` from `--set-env-vars`. Cloud Run injects it automatically. |
+| `allUsers` IAM binding fails (org policy) | Your Google Workspace org blocks public access. See the "Google Workspace / Organization Policy" section above. |
+| `gcloud` apt install hangs on WSL | Use `sudo snap install google-cloud-cli --classic` instead. |
