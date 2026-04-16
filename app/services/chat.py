@@ -230,6 +230,31 @@ async def run_chat_turn(
     # 6. Check which required fields are still missing
     missing_required = [f for f in _REQUIRED_FIELDS if merged_features.get(f) is None]
 
+    # 6b. If all required fields are present, validate ranges now — before emitting
+    # the features event or streaming the reply. If any field is out of range,
+    # remove it from merged_features so the client de-accumulates it, then ask
+    # the user to re-enter the corrected value.
+    validation_clarification: str | None = None
+    if not missing_required:
+        try:
+            PropertyFeatures(**merged_features)
+        except ValidationError as exc:
+            bad_fields = [str(e["loc"][0]) for e in exc.errors()]
+            for field in bad_fields:
+                merged_features.pop(field, None)
+            missing_required = [f for f in _REQUIRED_FIELDS if merged_features.get(f) is None]
+            field_labels = [_FIELD_LABELS.get(f, f) for f in bad_fields]
+            validation_clarification = (
+                f"The value{'s' if len(bad_fields) > 1 else ''} you provided for "
+                f"{', '.join(field_labels)} "
+                f"{'are' if len(bad_fields) > 1 else 'is'} outside the expected range. "
+                f"Could you provide {'those' if len(bad_fields) > 1 else 'that'} again?"
+            )
+            logger.warning(
+                "Removed out-of-range fields %s from merged_features — asking user to re-enter",
+                bad_fields,
+            )
+
     logger.info(
         "Chat turn — intent=%s, missing_required=%s, extracted_keys=%s, accumulated_keys=%s",
         intent,
@@ -239,25 +264,31 @@ async def run_chat_turn(
     )
 
     # 7. Emit extracted features (metadata only — no display text)
+    # Uses merged_features with any invalid fields already removed, so the client
+    # de-accumulates out-of-range values instead of keeping them.
     non_null_features = {k: v for k, v in merged_features.items() if v is not None}
     yield _sse_event("features", {"extracted_features": non_null_features})
 
-    # 8. Route based on intent and completeness
-    if intent == "chat" or missing_required:
-        # Stream the conversational reply as word-level tokens
-        async for event in _stream_text_as_tokens(reply):
+    # 8. Route based on completeness (intent is a hint, but complete features always predict)
+    if missing_required:
+        # Stream clarification reply (range error) or LLM reply (genuinely missing fields)
+        final_reply = validation_clarification or reply
+        async for event in _stream_text_as_tokens(final_reply):
             yield event
         yield _sse_event("done", {})
         return
 
-    # 9. All required features present — stream reply, then predict
+    # 9. All required features present and ranges validated — stream reply, then predict
+    # intent may be "chat" here (e.g. user said "hello?" after providing all features);
+    # we predict anyway because the features are complete.
     async for event in _stream_text_as_tokens(reply):
         yield event
 
+    # Validation already ran in step 6b — this should not raise, but guard defensively.
     try:
         features = PropertyFeatures(**merged_features)
     except ValidationError as exc:
-        logger.error("PropertyFeatures validation failed after merging: %s", exc)
+        logger.error("PropertyFeatures validation failed unexpectedly in step 9: %s", exc)
         yield _sse_event("error", {
             "code": "VALIDATION_ERROR",
             "message": "I couldn't validate the property details. Could you clarify the values you provided?",
