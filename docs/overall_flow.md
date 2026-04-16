@@ -24,7 +24,12 @@ This document describes the end-to-end technical pipeline of the AI Real Estate 
    - [LightGBM Model](#23-lightgbm-model)
    - [Evaluation Results](#24-evaluation-results)
    - [Model Serialization](#25-model-serialization)
-3. [API and Conversational Interface](#3-api-and-conversational-interface) *(next phase)*
+3. [API and Conversational Interface](#3-api-and-conversational-interface)
+   - [Endpoints Overview](#31-endpoints-overview)
+   - [Chat Turn Flow](#32-chat-turn-flow)
+   - [Server-Sent Events (SSE)](#33-server-sent-events-sse)
+   - [Stateless Design](#34-stateless-design)
+   - [LLM Client Architecture](#35-llm-client-architecture)
 
 ---
 
@@ -289,11 +294,142 @@ This file allows the explanation LLM to ground its output in real statistics (e.
 
 ## 3. API and Conversational Interface
 
-*This section will be completed in the next phase of documentation, covering:*
+**Implementation:** `app/` (FastAPI application)
 
-- *FastAPI application structure and endpoint design*
-- *LLM-based conversational feature extraction (Stage 1)*
-- *ML prediction serving (Stage 2)*
-- *LLM explanation generation with streaming responses (Stage 3)*
-- *Chat interface and multi-turn conversation flow*
-- *Docker containerization*
+The serving layer is a single-process FastAPI application. The ML pipeline is loaded once at startup via an async lifespan context manager and stored in `app.state` — it is never loaded inside a request handler. If the model artifact is missing at startup, the application fails immediately.
+
+### 3.1 Endpoints Overview
+
+| Endpoint | Method | Purpose | Used by frontend? |
+|----------|--------|---------|-------------------|
+| `/health` | GET | Liveness check — reports whether the ML pipeline and training stats are loaded | Yes (startup check) |
+| `/chat` | POST | Conversational interface — multi-turn feature collection, prediction, and streaming explanation | **Yes (primary)** |
+| `/extract` | POST | Stage 1 only — LLM feature extraction from a property description | No (available for testing) |
+| `/predict` | POST | Full pipeline — extraction → prediction → explanation in one request | No (service called internally by `/chat`) |
+
+#### `GET /health`
+
+Returns a JSON object with `status`, `model_loaded`, and `stats_loaded` fields. Returns HTTP 200 if both the ML pipeline and training statistics are loaded, HTTP 503 otherwise. Used by the frontend and container orchestrators to verify the application is ready to serve requests.
+
+#### `POST /extract`
+
+Accepts a `description` string (plain-English property description). Sends it to the LLM with the extraction prompt, parses the JSON response, validates it against the `PropertyFeatures` Pydantic schema, and checks for missing required fields. Returns one of three statuses:
+
+- `"complete"` — all 4 required features extracted successfully
+- `"partial"` — some required features are missing (listed in `missing_required_fields`)
+- `"not_a_property"` — guardrail triggered; the input was not a property description
+
+This endpoint is not used by the current frontend. It exists for isolated testing of Stage 1 and for potential future integrations that need extraction without the full conversational flow.
+
+#### `POST /predict`
+
+Runs the full pipeline in a single request: LLM extraction → Pydantic validation → ML prediction → LLM explanation. Accepts an optional `supplemental_features` dict so a client can fill gaps from the initial extraction. Returns a `PredictResponse` with the predicted price in USD and a plain-English explanation.
+
+This endpoint is also not used by the current frontend — the conversational `/chat` endpoint replaced this single-shot flow. However, the prediction *service* (`predict()`) that powers this endpoint is the same one called internally by the chat service once all required features are collected.
+
+#### `POST /chat` — Primary Interface
+
+This is the endpoint the frontend uses. It implements a stateless, multi-turn conversational interface over Server-Sent Events (SSE). The endpoint accepts a user message, the conversation history, and the accumulated features collected so far — all session state is managed by the client.
+
+### 3.2 Chat Turn Flow
+
+Each call to `POST /chat` executes one conversational turn through the following steps:
+
+```
+Client sends: { message, history[], accumulated_features{} }
+                          │
+                          ▼
+              ┌────────────────────────┐
+              │ 1. Build system prompt │  ← injects known/missing features
+              │    with feature context│     into the chat prompt template
+              └──────────┬─────────────┘
+                         │
+                         ▼
+              ┌───────────────────────┐
+              │ 2. LLM call (non-     │  ← full history passed; JSON mode
+              │    streaming) for     │     returns intent + reply + features
+              │    intent + extraction│
+              └──────────┬────────────┘
+                         │
+                         ▼
+              ┌───────────────────────┐
+              │ 3. Merge new features │  ← new non-null values overwrite
+              │    into accumulated   │     accumulated; nulls are ignored
+              └──────────┬────────────┘
+                         │
+                    ┌────┴────┐
+                    │ intent? │
+                    └────┬────┘
+               ┌─────────┴──────────┐
+               ▼                    ▼
+        intent="chat"         intent="property"
+        OR required fields    AND all 4 required
+        still missing         fields present
+               │                    │
+               ▼                    ▼
+        Stream reply as      Stream reply, then:
+        token events →       ├─ Validate → PropertyFeatures
+        emit done            ├─ ML predict() → prediction event
+                             ├─ Build explanation prompt
+                             ├─ Stream explanation tokens
+                             └─ emit done
+```
+
+The LLM classifies each user message as either `"chat"` (general conversation, follow-up questions) or `"property"` (contains property information). When the intent is `"property"`, the LLM also extracts structured features from the message. Features accumulate across turns — the user does not need to provide all information in one message.
+
+Once all 4 required fields (`GrLivArea`, `OverallQual`, `YearBuilt`, `Neighborhood`) are present, the service constructs a `PropertyFeatures` instance, runs the ML prediction, and streams an LLM-generated explanation of the result.
+
+### 3.3 Server-Sent Events (SSE)
+
+The `/chat` endpoint returns a `text/event-stream` response — this is the Server-Sent Events protocol. Unlike WebSockets, SSE is a one-directional channel: the server pushes events to the client over a single long-lived HTTP connection. The client receives events as they are generated, enabling real-time streaming of LLM output without waiting for the full response to complete.
+
+Each SSE event has the format:
+
+```
+event: <type>
+data: <JSON payload>
+
+```
+
+The frontend receives five event types:
+
+| Event Type | Payload | When Emitted |
+|------------|---------|--------------|
+| `features` | `{"extracted_features": {...}}` | After every turn — contains all non-null accumulated features as metadata |
+| `token` | `{"text": "<chunk>"}` | For each word/chunk of the conversational reply and the explanation — the frontend appends these to build the displayed text |
+| `prediction` | `{"prediction_usd": 183400, "features": {...}}` | Once, after all required features are collected and ML inference completes |
+| `done` | `{}` | Signals the end of the event stream for this turn |
+| `error` | `{"code": "...", "message": "..."}` | If any stage fails — terminates the stream |
+
+#### Why SSE over WebSockets?
+
+SSE is simpler: it works over plain HTTP, requires no upgrade handshake, and is natively supported by the browser `EventSource` API. The chat interface only needs server-to-client streaming (the client sends messages via regular POST requests) — there is no need for bidirectional communication. SSE is the right tool for this uni-directional streaming pattern.
+
+#### Streaming Behavior
+
+The reply text (conversational response) is streamed as word-level `token` events. This gives the frontend a typing-like effect where text appears incrementally.
+
+The explanation text is streamed differently — it uses the LLM's native streaming API (`chat_completion_stream`), so tokens arrive as the LLM generates them. This means the user sees the explanation being written in real time, with no delay waiting for the full response.
+
+Between the `prediction` event and the explanation tokens, the service yields control to the event loop (`await asyncio.sleep(0)`) to ensure the frontend receives and processes the prediction event as a distinct chunk before explanation tokens start arriving.
+
+### 3.4 Stateless Design
+
+The `/chat` endpoint is fully stateless on the server. The client manages:
+
+- **Conversation history** — a list of `{role, content}` message pairs, capped at 50 turns
+- **Accumulated features** — a dict of feature names → values collected across turns
+
+Both are sent with every request. This means the server needs no session storage, database, or Redis — it reconstructs the full context from the request body on every turn. This simplifies deployment (single container, no shared state) and makes horizontal scaling trivial if ever needed.
+
+### 3.5 LLM Client Architecture
+
+Both development and production environments use the same `AsyncOpenAI` client — the only difference is configuration:
+
+| Setting | Development (Ollama) | Production (Groq) |
+|---------|---------------------|-------------------|
+| `llm_base_url` | `http://localhost:11434/v1` | `https://api.groq.com/openai/v1` |
+| `llm_model` | `phi4-mini` | `llama-3.3-70b-versatile` |
+| `llm_api_key` | `"ollama"` (ignored) | Groq API key from env |
+
+Provider switching is purely configuration — no code branching. Both Ollama and Groq expose OpenAI-compatible APIs, so a single `AsyncOpenAI(base_url=..., api_key=...)` client works for both. The active provider is determined by the `ENVIRONMENT` environment variable (`"development"` or `"production"`).
