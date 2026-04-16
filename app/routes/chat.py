@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.clients.llm import create_llm_client
-from app.config import settings
+from app.config import resolve_prompt_version, settings
 from app.schemas.chat import ChatRequest
 from app.services.chat import load_chat_prompt, run_chat_turn
 from app.services.explanation import load_explanation_prompt
@@ -33,6 +33,17 @@ def _get_chat_prompt(app_state, version: str) -> str:
             settings.prompts_dir, version
         )
     return app_state.chat_prompts[version]
+
+
+def _get_explanation_prompt(app_state, version: str) -> str:
+    """Load an explanation prompt by version, caching on app.state.explanation_prompts dict."""
+    if not hasattr(app_state, "explanation_prompts"):
+        app_state.explanation_prompts = {}
+    if version not in app_state.explanation_prompts:
+        app_state.explanation_prompts[version] = load_explanation_prompt(
+            settings.prompts_dir, version
+        )
+    return app_state.explanation_prompts[version]
 
 
 @router.post("/chat", include_in_schema=True)
@@ -60,7 +71,7 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
         )
 
     # Resolve prompt version: client override or server default
-    version = body.prompt_version or settings.chat_prompt_version
+    version = resolve_prompt_version(body.prompt_version or settings.prompt_version)
 
     logger.info(
         "POST /chat message_len=%d history_turns=%d accumulated_keys=%s prompt_version=%s",
@@ -70,23 +81,18 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
         version,
     )
 
-    # Load chat prompt (cached per version)
+    # Load chat and explanation prompts (cached per version)
     try:
         chat_prompt = _get_chat_prompt(request.app.state, version)
+        explanation_prompt = _get_explanation_prompt(request.app.state, version)
     except FileNotFoundError:
         raise HTTPException(
             status_code=422,
             detail={
                 "status": "error",
                 "error_code": "INVALID_PROMPT_VERSION",
-                "message": f"Chat prompt version '{version}' not found.",
+                "message": f"Prompt version '{version}' not found.",
             },
-        )
-
-    # Load explanation prompt once (not versioned yet)
-    if not hasattr(request.app.state, "explanation_prompt"):
-        request.app.state.explanation_prompt = load_explanation_prompt(
-            settings.prompts_dir, settings.explanation_prompt_version
         )
 
     client = create_llm_client()
@@ -100,7 +106,8 @@ async def chat_route(request: Request, body: ChatRequest) -> StreamingResponse:
             pipeline=request.app.state.pipeline,
             training_stats=request.app.state.training_stats,
             chat_prompt_template=chat_prompt,
-            explanation_prompt_template=request.app.state.explanation_prompt,
+            explanation_prompt_template=explanation_prompt,
+            prompt_version=version,
         ):
             yield event
 

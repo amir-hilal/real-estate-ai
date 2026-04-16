@@ -16,6 +16,7 @@ from openai import AsyncOpenAI
 
 from app.clients.llm import chat_completion
 from app.config import settings
+from app.constants import NEIGHBORHOOD_NAMES
 from app.schemas.property_features import PropertyFeatures
 
 logger = logging.getLogger(__name__)
@@ -27,11 +28,11 @@ class ExplanationError(Exception):
 
 def load_explanation_prompt(prompts_dir: Path, version: str) -> str:
     """Load the explanation prompt template from disk."""
-    prompt_path = prompts_dir / f"explanation_{version}.md"
+    prompt_path = prompts_dir / version / "explanation.md"
     if not prompt_path.exists():
         raise FileNotFoundError(
             f"Explanation prompt not found at {prompt_path}. "
-            f"Expected file: explanation_{version}.md in {prompts_dir}/"
+            f"Expected file: {version}/explanation.md in {prompts_dir}/"
         )
     return prompt_path.read_text(encoding="utf-8")
 
@@ -41,6 +42,7 @@ def build_explanation_prompt(
     features: PropertyFeatures,
     predicted_price: float,
     training_stats: dict,
+    version: str = "v1",
 ) -> str:
     """
     Render the explanation prompt template with real data.
@@ -56,8 +58,9 @@ def build_explanation_prompt(
     nbhd_medians = training_stats.get("neighborhood_median_price", {})
     if neighborhood and neighborhood in nbhd_medians:
         nbhd_median = nbhd_medians[neighborhood]
+        display_name = NEIGHBORHOOD_NAMES.get(neighborhood, neighborhood) if version >= "v3" else neighborhood
         neighborhood_stat_line = (
-            f"- Median sale price in the {neighborhood} neighborhood: ${nbhd_median:,}"
+            f"- Median sale price in the {display_name} neighborhood: ${nbhd_median:,}"
         )
     else:
         neighborhood_stat_line = ""
@@ -85,7 +88,7 @@ def build_explanation_prompt(
     )
 
     # --- Property lines (non-null fields only) ---
-    property_lines = _format_property_lines(features)
+    property_lines = _format_property_lines(features, version=version)
 
     # --- Price bracket instruction ---
     p25 = training_stats["price_25th_percentile"]
@@ -120,7 +123,7 @@ def build_explanation_prompt(
     )
 
 
-def _format_property_lines(features: PropertyFeatures) -> str:
+def _format_property_lines(features: PropertyFeatures, version: str = "v1") -> str:
     """
     Format non-null PropertyFeatures fields as plain-English lines.
 
@@ -146,6 +149,8 @@ def _format_property_lines(features: PropertyFeatures) -> str:
     for field, (label, fmt) in labels.items():
         val = data.get(field)
         if val is not None:
+            if field == "Neighborhood" and version >= "v3":
+                val = NEIGHBORHOOD_NAMES.get(val, val)
             lines.append(f"- {label}: {fmt.format(v=val)}")
     return "\n".join(lines) if lines else "- No specific details provided."
 

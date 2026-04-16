@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.clients.llm import create_llm_client
-from app.config import settings
+from app.config import resolve_prompt_version, settings
 from app.schemas.property_features import PropertyFeatures
 from app.schemas.responses import ErrorResponse, PredictResponse
 from app.services.explanation import ExplanationError, generate_explanation, load_explanation_prompt, build_explanation_prompt
@@ -81,7 +81,7 @@ async def predict_route(request: Request, body: PredictRequest) -> PredictRespon
         )
     if not hasattr(request.app.state, "explanation_prompt"):
         request.app.state.explanation_prompt = load_explanation_prompt(
-            settings.prompts_dir, settings.explanation_prompt_version
+            settings.prompts_dir, resolve_prompt_version(settings.prompt_version)
         )
 
     extraction_prompt = request.app.state.extraction_prompt

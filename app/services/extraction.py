@@ -38,11 +38,11 @@ class ExtractionError(Exception):
 
 def load_extraction_prompt(prompts_dir: Path, version: str) -> str:
     """Load the extraction prompt file content."""
-    prompt_path = prompts_dir / f"extraction_{version}.md"
+    prompt_path = prompts_dir / version / "extraction.md"
     if not prompt_path.exists():
         raise FileNotFoundError(
             f"Extraction prompt not found at {prompt_path}. "
-            f"Expected file: extraction_{version}.md in {prompts_dir}/"
+            f"Expected file: {version}/extraction.md in {prompts_dir}/"
         )
     return prompt_path.read_text(encoding="utf-8")
 

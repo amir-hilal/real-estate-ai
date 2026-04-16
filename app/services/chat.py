@@ -50,11 +50,11 @@ _FIELD_LABELS = {
 
 def load_chat_prompt(prompts_dir: Path, version: str) -> str:
     """Load the chat prompt template from disk."""
-    prompt_path = prompts_dir / f"chat_{version}.md"
+    prompt_path = prompts_dir / version / "chat.md"
     if not prompt_path.exists():
         raise FileNotFoundError(
             f"Chat prompt not found at {prompt_path}. "
-            f"Expected: chat_{version}.md in {prompts_dir}/"
+            f"Expected: {version}/chat.md in {prompts_dir}/"
         )
     return prompt_path.read_text(encoding="utf-8")
 
@@ -155,6 +155,7 @@ async def run_chat_turn(
     training_stats: dict,
     chat_prompt_template: str,
     explanation_prompt_template: str,
+    prompt_version: str = "v1",
 ) -> AsyncIterator[str]:
     """
     Execute one chat turn and yield SSE event strings.
@@ -289,6 +290,7 @@ async def run_chat_turn(
         features=features,
         predicted_price=price,
         training_stats=training_stats,
+        version=prompt_version,
     )
 
     try:

@@ -13,7 +13,7 @@ Duration: ~60–120s (three LLM calls per full pipeline test)
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.config import settings
+from app.config import resolve_prompt_version, settings
 from app.main import app
 from app.services.explanation import load_explanation_prompt
 from app.services.extraction import load_extraction_prompt
@@ -39,7 +39,7 @@ def real_app_state():
         settings.prompts_dir, settings.extraction_prompt_version
     )
     app.state.explanation_prompt = load_explanation_prompt(
-        settings.prompts_dir, settings.explanation_prompt_version
+        settings.prompts_dir, resolve_prompt_version(settings.prompt_version)
     )
     yield
     for attr in ("pipeline", "training_stats", "extraction_prompt", "explanation_prompt"):

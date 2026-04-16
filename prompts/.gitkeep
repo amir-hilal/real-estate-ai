@@ -1,3 +1,3 @@
 # Extraction prompt file name resolved from config at runtime (extraction_prompt_version)
-# Explanation prompt file name resolved from config at runtime (explanation_prompt_version)
+# Prompt files are organized in versioned directories: v1/, v2/, v3/
 # Prompt files live in prompts/ — never embedded as strings in code

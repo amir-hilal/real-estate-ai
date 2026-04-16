@@ -1,4 +1,6 @@
+import re
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,8 +21,7 @@ class Settings(BaseSettings):
 
     # Prompt versioning
     extraction_prompt_version: str = "v1"
-    explanation_prompt_version: str = "v1"
-    chat_prompt_version: str = "v3"
+    prompt_version: str = "latest"
 
     # ML model artifact
     model_path: Path = Path("ml/artifacts/model.joblib")
@@ -68,3 +69,30 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+_VERSION_PATTERN = re.compile(r"^v(\d+)$")
+
+
+def resolve_prompt_version(version: str | None = None) -> str:
+    """
+    Resolve a prompt version string to a concrete version directory name.
+
+    - ``None`` or ``"latest"`` → highest ``vN/`` directory in ``prompts_dir``
+      that contains both ``chat.md`` and ``explanation.md``.
+    - Any other string (e.g. ``"v2"``) → returned as-is.
+    """
+    if version and version != "latest":
+        return version
+
+    best: int = 0
+    for path in settings.prompts_dir.iterdir():
+        if path.is_dir():
+            m = _VERSION_PATTERN.match(path.name)
+            if m and (path / "chat.md").exists() and (path / "explanation.md").exists():
+                n = int(m.group(1))
+                if n > best:
+                    best = n
+
+    if best == 0:
+        raise FileNotFoundError("No valid prompt version directories found in prompts/")
+    return f"v{best}"

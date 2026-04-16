@@ -72,7 +72,7 @@ Status: **Complete** ✓
   - [x] `app/schemas/chat.py` — `ChatMessage`, `ChatRequest` Pydantic models
   - [x] `prompts/chat_v2.md` — Combined intent classification + feature extraction prompt (v2: required-field prioritization, "go ahead" handling, inline mapping hints)
   - [x] `app/clients/llm.py` — `chat_completion_stream()` added for token-by-token streaming
-  - [x] `app/config.py` — `chat_prompt_version` setting (now defaults to v2), `cors_origin` setting
+  - [x] `app/config.py` — unified `prompt_version` setting (defaults to `"latest"`, auto-resolves to highest vN/), `cors_origin` setting
   - [x] CORS middleware added to FastAPI backend
   - [x] Standalone React app (Vite + React 18 + TypeScript + plain CSS) created and working
   - [x] Backend SSE streaming verified with curl and in React app

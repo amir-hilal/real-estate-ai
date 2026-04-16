@@ -45,8 +45,7 @@ GROQ_TIMEOUT=120
 
 # Prompt versioning
 EXTRACTION_PROMPT_VERSION=v1
-EXPLANATION_PROMPT_VERSION=v1
-CHAT_PROMPT_VERSION=v2
+PROMPT_VERSION=latest
 
 # Model artifacts (paths inside the container — no change needed)
 MODEL_PATH=ml/artifacts/model.joblib
@@ -166,8 +165,7 @@ GROQ_BASE_URL=https://api.groq.com/openai/v1,\
 GROQ_MODEL=llama-3.3-70b-versatile,\
 GROQ_TIMEOUT=120,\
 EXTRACTION_PROMPT_VERSION=v1,\
-EXPLANATION_PROMPT_VERSION=v1,\
-CHAT_PROMPT_VERSION=v2,\
+PROMPT_VERSION=latest,\
 MODEL_PATH=ml/artifacts/model.joblib,\
 TRAINING_STATS_PATH=ml/artifacts/training_stats.json,\
 HOST=0.0.0.0,\

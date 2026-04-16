@@ -38,8 +38,7 @@ GROQ_TIMEOUT=120
 
 # Prompt versioning
 EXTRACTION_PROMPT_VERSION=v1
-EXPLANATION_PROMPT_VERSION=v1
-CHAT_PROMPT_VERSION=v2
+PROMPT_VERSION=latest
 
 # Model artifacts (paths inside the container — no change needed)
 MODEL_PATH=ml/artifacts/model.joblib
@@ -126,8 +125,7 @@ Save as `ecs-task-definition.json`:
         { "name": "GROQ_MODEL", "value": "llama-3.3-70b-versatile" },
         { "name": "GROQ_TIMEOUT", "value": "120" },
         { "name": "EXTRACTION_PROMPT_VERSION", "value": "v1" },
-        { "name": "EXPLANATION_PROMPT_VERSION", "value": "v1" },
-        { "name": "CHAT_PROMPT_VERSION", "value": "v2" },
+        { "name": "PROMPT_VERSION", "value": "latest" },
         { "name": "MODEL_PATH", "value": "ml/artifacts/model.joblib" },
         { "name": "TRAINING_STATS_PATH", "value": "ml/artifacts/training_stats.json" },
         { "name": "HOST", "value": "0.0.0.0" },
@@ -317,8 +315,7 @@ GROQ_BASE_URL=https://api.groq.com/openai/v1
 GROQ_MODEL=llama-3.3-70b-versatile
 GROQ_TIMEOUT=120
 EXTRACTION_PROMPT_VERSION=v1
-EXPLANATION_PROMPT_VERSION=v1
-CHAT_PROMPT_VERSION=v2
+PROMPT_VERSION=latest
 MODEL_PATH=ml/artifacts/model.joblib
 TRAINING_STATS_PATH=ml/artifacts/training_stats.json
 HOST=0.0.0.0

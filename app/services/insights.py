@@ -7,6 +7,8 @@ with training statistics to produce data for frontend visualizations.
 
 import logging
 
+from app.constants import NEIGHBORHOOD_NAMES
+
 logger = logging.getLogger(__name__)
 
 # Human-readable display names for model features
@@ -22,35 +24,6 @@ _DISPLAY_NAMES = {
     "Fireplaces": "Fireplaces",
     "MasVnrArea": "Masonry Veneer Area",
     "FullBath": "Full Bathrooms",
-}
-
-# Neighborhood code → full name decoder
-_NEIGHBORHOOD_NAMES = {
-    "NAmes": "North Ames",
-    "CollgCr": "College Creek",
-    "OldTown": "Old Town",
-    "Edwards": "Edwards",
-    "Somerst": "Somerset",
-    "Gilbert": "Gilbert",
-    "NridgHt": "Northridge Heights",
-    "Sawyer": "Sawyer",
-    "NWAmes": "Northwest Ames",
-    "SawyerW": "Sawyer West",
-    "BrkSide": "Brookside",
-    "Crawfor": "Crawford",
-    "Mitchel": "Mitchell",
-    "NoRidge": "Northridge",
-    "Timber": "Timberland",
-    "IDOTRR": "Iowa DOT & Rail Road",
-    "ClearCr": "Clear Creek",
-    "StoneBr": "Stone Brook",
-    "SWISU": "South & West of ISU",
-    "Blmngtn": "Bloomington Heights",
-    "MeadowV": "Meadow Village",
-    "BrDale": "Briardale",
-    "Veenker": "Veenker",
-    "NPkVill": "Northpark Villa",
-    "Blueste": "Bluestem",
 }
 
 # Numeric features in column order (must match training pipeline)
@@ -119,7 +92,7 @@ def build_insights_response(pipeline, training_stats: dict) -> dict:
         [
             {
                 "code": code,
-                "name": _NEIGHBORHOOD_NAMES.get(code, code),
+                "name": NEIGHBORHOOD_NAMES.get(code, code),
                 "median_price": price,
             }
             for code, price in nbhd_prices.items()
